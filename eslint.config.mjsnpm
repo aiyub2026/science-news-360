@@ -12,3 +12,5 @@ export default defineConfig([
     "node_modules/**"
   ])
 ]);
+run
+build
