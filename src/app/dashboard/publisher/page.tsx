@@ -1,0 +1,2 @@
+import RoleDashboard from '@/components/auth/RoleDashboard';
+export default function Page(){return <RoleDashboard roles={['PUBLISHER']} title="Halaman Penerbit" subtitle="Jadwalkan, terbitkan, koreksi, atau tarik konten yang telah disetujui." cards={[{label:'Siap terbit',value:'0',note:'Belum ada artikel'},{label:'Terjadwal',value:'0',note:'Belum ada jadwal'},{label:'Koreksi',value:'0',note:'Tidak ada permintaan'}]} links={[{label:'Buka antrean penerbitan',href:'/dashboard/admin/workflow'},{label:'Lihat artikel terbit',href:'/id/latest'}]}/>} 

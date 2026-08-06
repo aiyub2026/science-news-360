@@ -1,0 +1,2 @@
+import RoleDashboard from '@/components/auth/RoleDashboard';
+export default function Page(){return <RoleDashboard roles={['SYSTEM_ADMINISTRATOR']} title="Pengelolaan Sistem" subtitle="Pantau keamanan akun, sesi aktif, dan pengaturan utama." cards={[{label:'Kondisi sistem',value:'Siap',note:'Tidak ada gangguan'},{label:'Sesi aktif',value:'1',note:'Sesi saat ini'},{label:'Peringatan keamanan',value:'0',note:'Tidak ada peringatan'}]} links={[{label:'Riwayat keamanan',href:'/dashboard/system-admin'},{label:'Kelola sesi',href:'/dashboard/system-admin'}]}/>} 

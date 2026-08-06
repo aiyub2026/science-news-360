@@ -1,0 +1,11 @@
+import {notFound} from "next/navigation";
+import Link from "next/link";
+import {Locale} from "@/lib/content";
+import {infoPages} from "@/lib/info-pages";
+
+export function generateStaticParams(){return Object.keys(infoPages).flatMap(slug=>["id","en"].map(locale=>({locale,slug})));}
+export default async function InfoPage({params}:{params:Promise<{locale:Locale;slug:string}>}){
+ const {locale,slug}=await params; const page=infoPages[slug]; if(!page) notFound(); const id=locale!=="en";
+ const related=Object.entries(infoPages).filter(([key])=>key!==slug).slice(0,4);
+ return <main className="info-page"><section className="info-hero"><div className="shell info-hero-inner"><div><span className="info-eyebrow">{page.eyebrow}</span><h1>{page.title}</h1><p>{page.lead}</p></div><aside><span>SCIENCE NEWS 360</span><strong>{id?"Trust & Governance":"Trust & Governance"}</strong><small>{id?"Standar editorial yang jelas, dapat ditelusuri, dan bertanggung jawab.":"Clear, traceable, and accountable editorial standards."}</small></aside></div></section><section className="info-content shell"><aside className="info-summary"><span>{id?"DOKUMEN PUBLIK":"PUBLIC DOCUMENT"}</span><p>{id?"Bagian dari kerangka transparansi dan tata kelola Science News 360.":"Part of the Science News 360 transparency and governance framework."}</p><nav>{related.map(([key,item])=><Link key={key} href={`/${locale}/info/${key}`}>{item.title}</Link>)}</nav><Link className="info-home-link" href={`/${locale}`}>← {id?"Kembali ke beranda":"Back to homepage"}</Link></aside><div className="info-sections">{page.sections.map((section,index)=><article key={section.title}><span>{String(index+1).padStart(2,"0")}</span><div><h2>{section.title}</h2><p>{section.body}</p></div></article>)}<div className="info-cta"><div><span>{id?"KONTRIBUSI":"CONTRIBUTE"}</span><h2>{id?"Siap mengirimkan karya Anda?":"Ready to submit your work?"}</h2><p>{id?"Daftar sebagai penulis, lengkapi profil, lalu kirim artikel untuk ditinjau tim editorial.":"Register as an author, complete your profile, and submit your work for editorial review."}</p></div><Link href={`/${locale}/register`}>{id?"Daftar Penulis":"Register as Author"} →</Link></div></div></section></main>;
+}

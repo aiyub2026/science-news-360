@@ -1,0 +1,2 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import EditorialSeoWorkspace from '@/components/cms/EditorialSeoWorkspace';
+export default function Page(){return <ProtectedPage capabilities={['SEO_EDIT']} title="Optimasi Pencarian"><DashboardShell type="admin"><EditorialSeoWorkspace role="admin"/></DashboardShell></ProtectedPage>}

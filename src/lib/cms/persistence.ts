@@ -1,0 +1,9 @@
+'use client';
+const DB_NAME='science-news-360',DB_VERSION=2,STORE='snapshots',SNAPSHOT='cms-state-v209';
+const LEGACY=['cms-state-v207'];
+const KEYS=['sn360-cms-content-v201','sn360-cms-audit-v201','sn360-media-assets-v201','sn360-author-profile-v201','sn360-youtube-settings-v1'];
+function openDb():Promise<IDBDatabase>{return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(STORE))req.result.createObjectStore(STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function getSnapshot(db:IDBDatabase,key:string){return new Promise<any>((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(key);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+export async function mirrorPersistentState(){if(typeof indexedDB==='undefined')return;try{const db=await openDb(),payload=Object.fromEntries(KEYS.map(k=>[k,localStorage.getItem(k)]));await new Promise<void>((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put({schemaVersion:9,updatedAt:new Date().toISOString(),payload},SNAPSHOT);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)});db.close()}catch{}}
+export async function initializePersistence(){if(typeof indexedDB==='undefined')return;try{const db=await openDb();let saved=await getSnapshot(db,SNAPSHOT);if(!saved)for(const k of LEGACY){saved=await getSnapshot(db,k);if(saved)break}db.close();if(saved?.payload)for(const [k,v] of Object.entries(saved.payload)){if(v&&localStorage.getItem(k)==null)localStorage.setItem(k,String(v))}await mirrorPersistentState()}catch{}}
+let mirrorTimer:number|undefined;export function scheduleMirror(){if(typeof window==='undefined')return;if(mirrorTimer)window.clearTimeout(mirrorTimer);mirrorTimer=window.setTimeout(()=>void mirrorPersistentState(),120)}

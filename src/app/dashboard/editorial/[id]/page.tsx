@@ -1,0 +1,2 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import FullEditorialWorkspace from '@/components/cms/FullEditorialWorkspace';
+export default async function Page({params}:{params:Promise<{id:string}>}){const {id}=await params;return <ProtectedPage capabilities={['REVIEW_CONTENT','EDIT_CONTENT','PUBLISH_CONTENT']} title="Ruang Editorial Lengkap"><DashboardShell type="admin"><FullEditorialWorkspace id={id}/></DashboardShell></ProtectedPage>}

@@ -1,0 +1,2 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import ContentHistory from '@/components/cms/ContentHistory';
+export default async function Page({params}:{params:Promise<{id:string}>}){const {id}=await params;return <ProtectedPage roles={['CONTRIBUTOR','AUTHOR','SENIOR_AUTHOR']} title="Riwayat Perubahan"><DashboardShell type="author"><ContentHistory id={id}/></DashboardShell></ProtectedPage>}

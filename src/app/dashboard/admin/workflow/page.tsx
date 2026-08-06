@@ -1,0 +1,2 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import AdminOperationsDashboard from '@/components/cms/AdminOperationsDashboard';
+export default function Page(){return <ProtectedPage capabilities={['REVIEW_CONTENT','EDIT_CONTENT','PUBLISH_CONTENT']} title="Alur Editorial"><DashboardShell type="admin"><AdminOperationsDashboard/></DashboardShell></ProtectedPage>}

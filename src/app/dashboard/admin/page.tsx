@@ -1,0 +1,2 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import AdminOperationsDashboard from '@/components/cms/AdminOperationsDashboard';
+export default function AdminDashboard(){return <ProtectedPage capabilities={['MANAGE_USERS','PUBLISH_CONTENT']} title="Halaman Administrator"><DashboardShell type="admin"><AdminOperationsDashboard/></DashboardShell></ProtectedPage>}
