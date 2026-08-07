@@ -40,7 +40,7 @@ const DB_FILE = path.join(process.cwd(), '.sn360-data', 'publications.json');
 const STORE_NAME = 'sn360-production-public-content-v21';
 const publicationKey = (locale:string,slug:string)=>`article:${locale}:${slug}`;
 
-function useNetlify(){return Boolean(process.env.NETLIFY || process.env.CONTEXT || process.env.NETLIFY_SITE_ID)}
+function useNetlify(){return Boolean(process.env.NETLIFY||process.env.CONTEXT||process.env.NETLIFY_SITE_ID||process.env.SITE_ID||process.env.SITE_NAME||process.env.URL)}
 async function blobStore(){const {getStore}=await import('@netlify/blobs');return getStore({name:STORE_NAME,consistency:'strong'});}
 async function readLocal():Promise<LocalDb>{try{return JSON.parse(await fs.readFile(DB_FILE,'utf8')) as LocalDb}catch{return {publications:{},media:{}}}}
 async function writeLocal(db:LocalDb){await fs.mkdir(path.dirname(DB_FILE),{recursive:true});await fs.writeFile(DB_FILE,JSON.stringify(db,null,2),'utf8')}

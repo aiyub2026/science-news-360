@@ -14,7 +14,7 @@ type SessionRecord={token:string;userId:string;createdAt:string;expiresAt:string
 export type SecurityAudit={id:string;action:string;userId?:string;email?:string;detail:string;at:string;ip?:string};
 type AuthDb={users:UserRecord[];sessions:SessionRecord[];audit:SecurityAudit[]};
 const empty=():AuthDb=>({users:[],sessions:[],audit:[]});
-const useNetlify=()=>Boolean(process.env.NETLIFY||process.env.CONTEXT||process.env.NETLIFY_SITE_ID);
+const useNetlify=()=>Boolean(process.env.NETLIFY||process.env.CONTEXT||process.env.NETLIFY_SITE_ID||process.env.SITE_ID||process.env.SITE_NAME||process.env.URL);
 async function blobStore(){const {getStore}=await import('@netlify/blobs');return getStore({name:STORE_NAME,consistency:'strong'});}
 async function readDb():Promise<AuthDb>{try{if(useNetlify()){const s=await blobStore();return (await s.get('auth-state',{type:'json',consistency:'strong'}) as AuthDb|null)||empty()}return JSON.parse(await fs.readFile(DB_FILE,'utf8')) as AuthDb}catch{return empty()}}
 async function writeDb(db:AuthDb){db.sessions=db.sessions.filter(s=>new Date(s.expiresAt).getTime()>Date.now());db.audit=db.audit.slice(-1000);if(useNetlify()){const s=await blobStore();await s.setJSON('auth-state',db);return}await fs.mkdir(path.dirname(DB_FILE),{recursive:true});await fs.writeFile(DB_FILE,JSON.stringify(db,null,2),'utf8')}
