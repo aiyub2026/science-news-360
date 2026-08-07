@@ -5,7 +5,7 @@ import {useEffect, useState} from 'react';
 type Props={title:string; locale:'id'|'en'; canonicalUrl?:string};
 
 function safePublicUrl(candidate?:string){
- try{const u=new URL(candidate||window.location.href);if(['localhost','127.0.0.1','0.0.0.0'].includes(u.hostname)){const base=process.env.NEXT_PUBLIC_SITE_URL||'https://sciencenews360.com';return new URL(window.location.pathname,base).toString()}u.hash='';u.search='';return u.toString()}catch{return 'https://sciencenews360.com'}
+ try{const u=new URL(candidate||window.location.href);if(['localhost','127.0.0.1','0.0.0.0'].includes(u.hostname)){const base=process.env.NEXT_PUBLIC_SITE_URL||'https://sciencenews360.my.id';return new URL(window.location.pathname,base).toString()}u.hash='';u.search='';return u.toString()}catch{return 'https://sciencenews360.my.id'}
 }
 
 export default function ArticleActions({title,locale,canonicalUrl}:Props){

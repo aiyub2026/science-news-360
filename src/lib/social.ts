@@ -1,5 +1,5 @@
 export const SITE_NAME = 'Science News 360 — Global Science, Education & Innovation';
-export const DEFAULT_SITE_URL = 'https://sciencenews360.com';
+export const DEFAULT_SITE_URL = 'https://sciencenews360.my.id';
 
 export function getSiteUrl() {
   const raw = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;

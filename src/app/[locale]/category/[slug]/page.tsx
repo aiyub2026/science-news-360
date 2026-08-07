@@ -1,24 +1,3 @@
-import Link from 'next/link';
-import {type Locale} from '@/lib/home-data';
-import {getAllArticles} from '@/lib/articles';import PublishedCategoryFeed from '@/components/cms/PublishedCategoryFeed';
-
-const labels:Record<string,{id:string;en:string}>={
- science:{id:'Sains',en:'Science'},
- technology:{id:'Teknologi',en:'Technology'},
- education:{id:'Pendidikan',en:'Education'},
- research:{id:'Riset',en:'Research'},
- opinion:{id:'Opini',en:'Opinion'}
-};
-
-export default async function Category({params}:{params:Promise<{locale:Locale,slug:string}>}){
- const {locale,slug}=await params;
- const mapped=labels[slug];
- const title=mapped?mapped[locale]:slug.charAt(0).toUpperCase()+slug.slice(1);
- const articles=getAllArticles(locale);
- return <main className="category-page">
-  <section className="category-hero"><div className="shell category-hero-grid"><div><span>KNOWLEDGE DESK</span><h1>{title}</h1><p>{locale==='id'?'Berita, analisis pakar, perkembangan riset, dan perspektif akademik yang dikurasi oleh tim editorial Science News 360.':'News, expert analysis, research developments, and academic perspectives curated by the Science News 360 editorial team.'}</p></div><aside><small>EDITORIAL FOCUS</small><strong>Evidence-led reporting</strong><p>{locale==='id'?'Akurat, kontekstual, mudah dipahami, dan dapat ditelusuri sumbernya.':'Accurate, contextual, accessible, and traceable to its sources.'}</p></aside></div></section>
-  <section className="shell category-content"><div className="category-title"><div><span>LATEST COVERAGE</span><h2>{locale==='id'?'Terbaru dalam':'Latest in'} {title}</h2></div><p>{locale==='id'?'Pilihan berita dan artikel untuk pembaca global.':'Selected news and articles for a global audience.'}</p></div>
-   <PublishedCategoryFeed locale={locale} category={slug}/><div className="category-grid">{articles.map((article,index)=><article className="card" key={article.slug}><Link href={`/${locale}/article/${article.slug}`} className="card-visual card-visual-image" style={index>2?{filter:`hue-rotate(${index*35}deg)`}:undefined}><img src={article.image} alt={article.title}/></Link><div className="card-body"><span className="eyebrow">{article.category}</span><h3 className="serif"><Link href={`/${locale}/article/${article.slug}`}>{article.title}</Link></h3><p className="summary">{article.summary}</p><div className="meta"><span>{article.author}</span><span>{article.time}</span></div></div></article>)}</div>
-  </section>
- </main>
-}
+import Link from 'next/link';import {listPublishedArticles} from '@/lib/server-publications';
+const labels:Record<string,{id:string;en:string}>={science:{id:'Sains',en:'Science'},technology:{id:'Teknologi',en:'Technology'},education:{id:'Pendidikan',en:'Education'},research:{id:'Riset',en:'Research'},opinion:{id:'Opini',en:'Opinion'}};export const dynamic='force-dynamic';
+export default async function Category({params}:{params:Promise<{locale:string,slug:string}>}){const {locale,slug}=await params;const lang=locale==='en'?'en':'id';const title=labels[slug]?.[lang]||slug.charAt(0).toUpperCase()+slug.slice(1);const key=slug.replaceAll('-',' ').toLowerCase();const rows=(await listPublishedArticles()).filter(a=>a.locale===lang&&(key==='science'||`${a.category} ${a.type} ${(a.tags||[]).join(' ')}`.toLowerCase().includes(key))).sort((a,b)=>new Date(b.publishedAt).getTime()-new Date(a.publishedAt).getTime());return <main className="category-page"><section className="category-hero"><div className="shell category-hero-grid"><div><span>KNOWLEDGE DESK</span><h1>{title}</h1><p>{lang==='id'?'Artikel yang telah melewati proses editorial Science News 360.':'Articles that have completed the Science News 360 editorial process.'}</p></div></div></section><section className="shell category-content"><div className="category-title"><div><span>LATEST COVERAGE</span><h2>{lang==='id'?'Terbaru dalam':'Latest in'} {title}</h2></div></div>{rows.length?<div className="category-grid">{rows.map(a=><article className="card" key={a.id}><Link href={`/${lang}/article/${a.slug}`} className="card-visual card-visual-image"><img src={a.thumbnailUrl} alt={a.thumbnailAlt||a.title}/></Link><div className="card-body"><span className="eyebrow">{a.category}</span><h3 className="serif"><Link href={`/${lang}/article/${a.slug}`}>{a.title}</Link></h3><p className="summary">{a.summary}</p><div className="meta"><span>{a.author}</span><span>{new Date(a.publishedAt).toLocaleDateString(lang==='id'?'id-ID':'en-US')}</span></div></div></article>)}</div>:<div className="dashboard-empty-state"><h2>{lang==='id'?'Belum ada artikel dalam kategori ini':'No articles in this category yet'}</h2><p>{lang==='id'?'Konten akan muncul setelah diterbitkan oleh tim editorial.':'Content will appear after editorial publication.'}</p></div>}</section></main>}

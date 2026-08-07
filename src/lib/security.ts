@@ -1,0 +1,1 @@
+export function sameOrigin(request:Request){const origin=request.headers.get('origin');if(!origin)return true;try{const requestOrigin=new URL(request.url).origin;const configured=process.env.NEXT_PUBLIC_SITE_URL?new URL(process.env.NEXT_PUBLIC_SITE_URL).origin:requestOrigin;return origin===requestOrigin||origin===configured}catch{return false}}

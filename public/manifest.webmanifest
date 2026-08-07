@@ -1,0 +1,11 @@
+{
+  "name": "Science News 360",
+  "short_name": "SN360",
+  "start_url": "/id",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b2d5b",
+  "icons": [
+    {"src":"/brand/science-news-360-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

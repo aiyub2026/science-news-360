@@ -6,7 +6,7 @@ export default function EnterpriseFooter({locale}:{locale:"id"|"en"}){
   return <footer className="enterprise-footer">
     <div className="shell footer-grid footer-grid-enterprise">
       <div className="footer-intro">
-        <Link href={`/${locale}`} className="footer-brand">SCIENCE NEWS <b>360</b></Link>
+        <Link href={`/${locale}`} className="footer-brand"><img src="/brand/science-news-360-logo.svg" alt="Science News 360"/></Link>
         <p>{isId?"Jurnalisme sains global, wawasan akademik, materi pembelajaran, dan pengetahuan publik dalam satu platform terpercaya.":"Global science journalism, academic insight, learning resources, and public knowledge in one trusted platform."}</p>
         <div className="socials" aria-label="Social media">
           <a href="https://www.youtube.com/@sciencenews360" target="_blank" rel="noreferrer" aria-label="YouTube">YT</a>

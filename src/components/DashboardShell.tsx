@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const ADMIN_LINKS = [
   ['Ringkasan','/dashboard/admin','⌂'],
+  ['Pengguna & Penulis','/dashboard/admin/users','♙'],
   ['Alur Editorial','/dashboard/admin/workflow','⇄'],
   ['Video & YouTube','/dashboard/admin/youtube','▶'],
   ['Optimasi Pencarian','/dashboard/admin/seo','◎'],
@@ -27,8 +28,8 @@ export function DashboardShell({type,children}:{type:'author'|'admin',children:R
     <div className={`dashboard dashboard-${type}`}>
       <aside className="sidebar">
         <Link className="dashboard-brand" href="/id">
-          <span>360</span>
-          <div><b>SCIENCE NEWS</b><small>{type === 'admin' ? 'PUSAT KENDALI' : 'RUANG PENULIS'}</small></div>
+          <img className="dashboard-logo-image" src="/brand/science-news-360-icon.svg" alt="Science News 360"/>
+          <div><b>SCIENCE NEWS 360</b><small>{type === 'admin' ? 'PUSAT KENDALI' : 'RUANG PENULIS'}</small></div>
         </Link>
         <nav className="sidebar-nav" aria-label="Navigasi utama">
           <span className="sidebar-section-label">MENU UTAMA</span>

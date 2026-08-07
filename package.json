@@ -1,6 +1,6 @@
 {
-  "name": "science-news-360-v2-ssr-social-crawler",
-  "version": "2.0.13",
+  "name": "science-news-360-production",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

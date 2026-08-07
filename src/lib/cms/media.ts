@@ -8,7 +8,7 @@ export function imageDimensions(dataUrl:string):Promise<{width:number;height:num
 function loadImage(src:string):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=src})}
 function estimatedBytes(dataUrl:string){const comma=dataUrl.indexOf(',');const payload=comma>=0?dataUrl.slice(comma+1):dataUrl;return Math.ceil(payload.length*0.75)}
 
-/** Compresses images aggressively enough to keep local prototype storage stable. */
+/** Compresses images aggressively enough to keep browser storage stable. */
 export async function prepareImage(file:File,kind:'thumbnail'|'inline'|'profile'='inline'):Promise<MediaMeta>{
  if(!IMAGE_TYPES.includes(file.type))throw new Error('Format harus JPG, PNG, atau WebP.');
  if(file.size>MAX_SOURCE_IMAGE)throw new Error('Ukuran file awal maksimum 10 MB.');

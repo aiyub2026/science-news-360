@@ -9,13 +9,13 @@ export function LoginForm({ locale, adminOnly = false }: { locale: 'id' | 'en'; 
   const { login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState(adminOnly ? 'admin@sciencenews360.com' : 'author@sciencenews360.com');
-  const [password, setPassword] = useState('Science360!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = login(email, password, adminOnly ? 'ADMINISTRATOR' : undefined);
+    const result = await login(email, password, adminOnly ? 'ADMINISTRATOR' : undefined);
     if (!result.ok) {
       setError(result.error || (locale === 'id' ? 'Login gagal.' : 'Sign-in failed.'));
       return;
@@ -82,14 +82,14 @@ export function RegisterForm({ locale }: { locale: 'id' | 'en' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = register(name, email, password, institution);
+    const result = await register(name, email, password, institution);
     if (!result.ok) {
-      setError(locale === 'id' ? 'Lengkapi data dan gunakan kata sandi minimal 8 karakter.' : 'Complete all fields and use at least 8 characters.');
+      setError(result.error || (locale === 'id' ? 'Lengkapi data dan gunakan kata sandi minimal 10 karakter.' : 'Complete all fields and use at least 10 characters.'));
       return;
     }
-    router.push(`/${locale}/verify-email`);
+    router.push(`/${locale}/contributor-application`);
   }
 
   return (
@@ -99,11 +99,11 @@ export function RegisterForm({ locale }: { locale: 'id' | 'en' }) {
         <div className="auth-field"><label htmlFor="register-institution">{locale === 'id' ? 'Institusi/Afiliasi' : 'Institution/Affiliation'}</label><input id="register-institution" value={institution} onChange={(event) => setInstitution(event.target.value)} placeholder="Universitas atau lembaga" required /></div>
       </div>
       <div className="auth-field"><label htmlFor="register-email">Email</label><input id="register-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required /></div>
-      <div className="auth-field"><label htmlFor="register-password">{locale === 'id' ? 'Kata sandi' : 'Password'}</label><input id="register-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={8} autoComplete="new-password" required /></div>
+      <div className="auth-field"><label htmlFor="register-password">{locale === 'id' ? 'Kata sandi' : 'Password'}</label><input id="register-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={10} autoComplete="new-password" required /></div>
       {error && <p className="form-error">{error}</p>}
       <label className="auth-consent"><input type="checkbox" required /><span>{locale === 'id' ? 'Saya menyetujui kebijakan editorial, ketentuan penulis, dan pemeriksaan artikel sebelum publikasi.' : 'I agree to the editorial policy, author terms, and pre-publication review.'}</span></label>
       <button className="btn btn-primary auth-submit" type="submit">{locale === 'id' ? 'Buat Akun Penulis' : 'Create Author Account'}</button>
-      <p className="auth-security-note">{locale === 'id' ? 'Setelah verifikasi email, Anda dapat membuat draft dan mengirimkannya kepada tim editor. Artikel tidak diterbitkan secara otomatis.' : 'After email verification, you can create drafts and submit them to the editorial team. Content is never published automatically.'}</p>
+      <p className="auth-security-note">{locale === 'id' ? 'Pendaftaran akan ditinjau Administrator. Setelah disetujui, akun Penulis dapat membuat draft dan mengirim artikel untuk review editorial.' : 'Registration is reviewed by an Administrator. Once approved, Authors can create drafts and submit them for editorial review.'}</p>
       <div className="author-signup-prompt"><span>{locale === 'id' ? 'Sudah memiliki akun?' : 'Already have an account?'}</span><Link href={`/${locale}/login`}>{locale === 'id' ? 'Masuk' : 'Sign in'}</Link></div>
     </form>
   );

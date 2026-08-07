@@ -1,3 +1,25 @@
-import type {MetadataRoute} from 'next';import {getAllArticles} from '@/lib/articles';import {getSiteUrl} from '@/lib/social';import {listPublishedArticles} from '@/lib/server-publications';
-export const dynamic='force-dynamic';
-export default async function sitemap():Promise<MetadataRoute.Sitemap>{const site=getSiteUrl();const dynamicArticles=await listPublishedArticles();const staticArticles=(['id','en'] as const).flatMap(locale=>getAllArticles(locale).map(a=>({url:`${site}/${locale}/article/${a.slug}`,lastModified:new Date('2026-08-04'),changeFrequency:'weekly' as const,priority:.8})));const published=dynamicArticles.map(a=>({url:a.canonicalUrl,lastModified:new Date(a.updatedAt),changeFrequency:'weekly' as const,priority:.9}));return [{url:site,lastModified:new Date(),changeFrequency:'daily',priority:1},{url:`${site}/id`,lastModified:new Date(),changeFrequency:'daily',priority:1},{url:`${site}/en`,lastModified:new Date(),changeFrequency:'daily',priority:1},...staticArticles,...published]}
+import type { MetadataRoute } from 'next';
+import { getSiteUrl } from '@/lib/social';
+import { listPublishedArticles } from '@/lib/server-publications';
+
+export const dynamic = 'force-dynamic';
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const site = getSiteUrl();
+  const articles = await listPublishedArticles();
+  const now = new Date();
+
+  return [
+    { url: site, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${site}/id`, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${site}/en`, lastModified: now, changeFrequency: 'daily', priority: 1 },
+    { url: `${site}/id/authors`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${site}/en/authors`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+    ...articles.map((article) => ({
+      url: article.canonicalUrl,
+      lastModified: new Date(article.updatedAt),
+      changeFrequency: 'weekly' as const,
+      priority: 0.9,
+    })),
+  ];
+}

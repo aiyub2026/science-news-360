@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server';import {registerContributor} from '@/lib/auth/server';import {sameOrigin} from '@/lib/security';
+export const runtime='nodejs';export async function POST(req:Request){if(!sameOrigin(req))return NextResponse.json({error:'Permintaan tidak diizinkan.'},{status:403});try{return NextResponse.json({ok:true,user:await registerContributor(await req.json())},{status:201})}catch(e){return NextResponse.json({ok:false,error:e instanceof Error?e.message:'Pendaftaran gagal.'},{status:400})}}

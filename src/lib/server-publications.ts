@@ -37,7 +37,7 @@ export type PublicArticle = {
 
 type LocalDb = { publications: Record<string, PublicArticle>; media: Record<string,{contentType:string,data:string}> };
 const DB_FILE = path.join(process.cwd(), '.sn360-data', 'publications.json');
-const STORE_NAME = 'sn360-public-content';
+const STORE_NAME = 'sn360-production-public-content-v21';
 const publicationKey = (locale:string,slug:string)=>`article:${locale}:${slug}`;
 
 function useNetlify(){return Boolean(process.env.NETLIFY || process.env.CONTEXT || process.env.NETLIFY_SITE_ID)}

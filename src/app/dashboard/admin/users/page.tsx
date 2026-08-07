@@ -1,0 +1,1 @@
+import {ProtectedPage} from '@/components/auth/ProtectedPage';import {DashboardShell} from '@/components/DashboardShell';import UserManagement from '@/components/cms/UserManagement';export default function Page(){return <ProtectedPage capabilities={['MANAGE_USERS']} title="Kelola Pengguna"><DashboardShell type="admin"><UserManagement/></DashboardShell></ProtectedPage>}

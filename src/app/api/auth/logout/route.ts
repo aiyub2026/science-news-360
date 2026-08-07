@@ -1,0 +1,2 @@
+import {NextResponse} from 'next/server';import {cookies} from 'next/headers';import {logout} from '@/lib/auth/server';
+export const runtime='nodejs';export async function POST(){const jar=await cookies();await logout(jar.get('sn360_session')?.value);const res=NextResponse.json({ok:true});res.cookies.set('sn360_session','',{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:0});return res}
