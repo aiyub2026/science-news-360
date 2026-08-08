@@ -58,7 +58,7 @@ export function canonicalArticleUrl(locale: 'id' | 'en', slug: string) {
 }
 
 export function socialImageUrl(locale: 'id' | 'en', slug: string, preferred?: string) {
-  if (isPublicHttpsImage(preferred)) return preferred as string;
+  if (isPublicHttpsImage(preferred)) return normalizePublicUrl(preferred);
   return absoluteUrl(`/${locale}/article/${encodeURIComponent(slug)}/opengraph-image`);
 }
 
