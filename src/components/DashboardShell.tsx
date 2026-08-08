@@ -39,7 +39,13 @@ export function DashboardShell({type,children}:{type:'author'|'admin',children:R
           })}
         </nav>
         <div className="sidebar-bottom">
-          <div className="admin-profile-mini"><span>AD</span><div><b>Administrator</b><small>Sesi aman</small></div></div>
+          <div className="admin-profile-mini">
+  <span>{type === 'admin' ? 'AD' : 'PN'}</span>
+  <div>
+    <b>{type === 'admin' ? 'Administrator' : 'Penulis'}</b>
+    <small>Sesi aman</small>
+  </div>
+</div>
           <Link href="/id">← Kembali ke website</Link>
         </div>
       </aside>
