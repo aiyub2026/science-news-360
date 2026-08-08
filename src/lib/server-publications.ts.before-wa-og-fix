@@ -68,7 +68,7 @@ export async function savePublishedArticle(record:ContentRecord):Promise<PublicA
   const thumbnailPublic=await persistMedia(record,record.thumbnail);
   const firstPublic=await persistMedia(record,record.inlineMedia?.[0]);
   const youtube=record.youtubeId?`https://i.ytimg.com/vi/${record.youtubeId}/maxresdefault.jpg`:undefined;
-  const socialCandidate=thumbnailPublic||youtube||firstPublic||(isPublicHttpsImage(record.socialImageUrl)?record.socialImageUrl:undefined);
+  const socialCandidate=isPublicHttpsImage(record.socialImageUrl)?record.socialImageUrl:thumbnailPublic||youtube||firstPublic;
   const fallback=absoluteUrl('/images/social-default-1200x630.webp');
   const canonical=absoluteUrl(`/${record.locale}/article/${encodeURIComponent(record.slug)}`);
   const article:PublicArticle={
