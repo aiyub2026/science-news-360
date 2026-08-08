@@ -9,7 +9,7 @@ const STORE_NAME='sn360-production-auth';
 const DB_FILE=path.join(process.cwd(),'.sn360-data','auth.json');
 const SESSION_TTL=60*60*24*14;
 
-export type UserRecord={id:string;name:string;email:string;institution:string;role:Role;verified:boolean;profileComplete:boolean;applicationStatus:ApplicationStatus;passwordHash:string;createdAt:string;updatedAt:string;lastLoginAt?:string};
+export type UserRecord={id:string;name:string;email:string;institution:string;role:Role;roles?:Role[];verified:boolean;profileComplete:boolean;applicationStatus:ApplicationStatus;passwordHash:string;createdAt:string;updatedAt:string;lastLoginAt?:string};
 type SessionRecord={token:string;userId:string;createdAt:string;expiresAt:string};
 export type SecurityAudit={id:string;action:string;userId?:string;email?:string;detail:string;at:string;ip?:string};
 type AuthDb={users:UserRecord[];sessions:SessionRecord[];audit:SecurityAudit[]};
@@ -20,16 +20,71 @@ async function readDb():Promise<AuthDb>{try{if(useNetlify()){const s=await blobS
 async function writeDb(db:AuthDb){db.sessions=db.sessions.filter(s=>new Date(s.expiresAt).getTime()>Date.now());db.audit=db.audit.slice(-1000);if(useNetlify()){const s=await blobStore();await s.setJSON('auth-state',db);return}await fs.mkdir(path.dirname(DB_FILE),{recursive:true});await fs.writeFile(DB_FILE,JSON.stringify(db,null,2),'utf8')}
 function normalizeEmail(v:string){return v.trim().toLowerCase()}
 function validEmail(v:string){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)}
-export function publicUser(u:UserRecord){const {passwordHash,...safe}=u;void passwordHash;return safe}
+export function publicUser(u:UserRecord){const {passwordHash,...safe}=u;void passwordHash;return {...safe,roles:u.roles?.length?u.roles:[u.role]}}
 export async function hashPassword(password:string){const salt=randomBytes(16).toString('hex');const derived=await scrypt(password,salt,64) as Buffer;return `${salt}:${derived.toString('hex')}`}
 export async function verifyPassword(password:string,stored:string){try{const [salt,key]=stored.split(':');const derived=await scrypt(password,salt,64) as Buffer;const expected=Buffer.from(key,'hex');return expected.length===derived.length&&timingSafeEqual(expected,derived)}catch{return false}}
 async function audit(db:AuthDb,action:string,detail:string,data:Partial<SecurityAudit>={}){db.audit.push({id:randomBytes(12).toString('hex'),action,detail,at:new Date().toISOString(),...data})}
-export async function registerContributor(input:{name:string;email:string;password:string;institution:string}){const db=await readDb();const email=normalizeEmail(input.email);if(!input.name.trim()||!input.institution.trim()||!validEmail(email)||input.password.length<10)throw new Error('Lengkapi data, gunakan email valid dan kata sandi minimal 10 karakter.');if(db.users.some(u=>u.email===email))throw new Error('Email sudah terdaftar.');const now=new Date().toISOString();const user:UserRecord={id:randomBytes(16).toString('hex'),name:input.name.trim(),email,institution:input.institution.trim(),role:'AUTHOR',verified:true,profileComplete:false,applicationStatus:'APPROVED',passwordHash:await hashPassword(input.password),createdAt:now,updatedAt:now};db.users.push(user);await audit(db,'AUTHOR_REGISTERED','Akun penulis berhasil diaktifkan secara otomatis.',{userId:user.id,email});await writeDb(db);return publicUser(user)}
-export async function bootstrapAdministrator(input:{name:string;email:string;password:string;secret:string}){const expected=process.env.SN360_ADMIN_BOOTSTRAP_SECRET;if(!expected||input.secret!==expected)throw new Error('Kode aktivasi Administrator tidak valid.');const db=await readDb();if(db.users.some(u=>['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(u.role)))throw new Error('Administrator pertama sudah dibuat.');const email=normalizeEmail(input.email);if(!input.name.trim()||!validEmail(email)||input.password.length<12)throw new Error('Gunakan email valid dan kata sandi minimal 12 karakter.');const now=new Date().toISOString();let user=db.users.find(u=>u.email===email);if(user){user.name=input.name.trim();user.role='SYSTEM_ADMINISTRATOR';user.verified=true;user.profileComplete=true;user.applicationStatus='APPROVED';user.passwordHash=await hashPassword(input.password);user.updatedAt=now}else{user={id:randomBytes(16).toString('hex'),name:input.name.trim(),email,institution:'Science News 360',role:'SYSTEM_ADMINISTRATOR',verified:true,profileComplete:true,applicationStatus:'APPROVED',passwordHash:await hashPassword(input.password),createdAt:now,updatedAt:now};db.users.push(user)}await audit(db,'ADMIN_BOOTSTRAPPED','Administrator pertama berhasil diaktifkan.',{userId:user.id,email});await writeDb(db);return publicUser(user)}
-export async function login(emailInput:string,password:string,adminOnly=false){const db=await readDb();const email=normalizeEmail(emailInput);const recentFailures=db.audit.filter(a=>a.action==='LOGIN_FAILED'&&a.email===email&&Date.now()-new Date(a.at).getTime()<15*60*1000).length;if(recentFailures>=5)throw new Error('Terlalu banyak percobaan masuk. Coba lagi setelah 15 menit.');const user=db.users.find(u=>u.email===email);if(!user||!(await verifyPassword(password,user.passwordHash))){await audit(db,'LOGIN_FAILED','Email atau kata sandi tidak cocok.',{email});await writeDb(db);throw new Error('Email atau kata sandi tidak valid.')}if(adminOnly&&!['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(user.role)){await audit(db,'ADMIN_LOGIN_DENIED','Pengguna tanpa hak Administrator mencoba masuk ke area Administrator.',{userId:user.id,email});await writeDb(db);throw new Error('Anda tidak diizinkan mengakses area Administrator.')}const token=randomBytes(32).toString('hex');const now=new Date();db.sessions.push({token,userId:user.id,createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+SESSION_TTL*1000).toISOString()});user.lastLoginAt=now.toISOString();user.updatedAt=now.toISOString();await audit(db,'LOGIN_SUCCESS','Pengguna berhasil masuk.',{userId:user.id,email});await writeDb(db);return {user:publicUser(user),token,maxAge:SESSION_TTL}}
+export async function registerContributor(input:{name:string;email:string;password:string;institution:string}){const db=await readDb();const email=normalizeEmail(input.email);if(!input.name.trim()||!input.institution.trim()||!validEmail(email)||input.password.length<10)throw new Error('Lengkapi data, gunakan email valid dan kata sandi minimal 10 karakter.');if(db.users.some(u=>u.email===email))throw new Error('Email sudah terdaftar.');const now=new Date().toISOString();const user:UserRecord={id:randomBytes(16).toString('hex'),name:input.name.trim(),email,institution:input.institution.trim(),role:'AUTHOR',roles:['AUTHOR'],verified:true,profileComplete:false,applicationStatus:'APPROVED',passwordHash:await hashPassword(input.password),createdAt:now,updatedAt:now};db.users.push(user);await audit(db,'AUTHOR_REGISTERED','Akun penulis berhasil diaktifkan secara otomatis.',{userId:user.id,email});await writeDb(db);return publicUser(user)}
+export async function bootstrapAdministrator(input:{name:string;email:string;password:string;secret:string}){const expected=process.env.SN360_ADMIN_BOOTSTRAP_SECRET;if(!expected||input.secret!==expected)throw new Error('Kode aktivasi Administrator tidak valid.');const db=await readDb();if(db.users.some(u=>['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(u.role)))throw new Error('Administrator pertama sudah dibuat.');const email=normalizeEmail(input.email);if(!input.name.trim()||!validEmail(email)||input.password.length<12)throw new Error('Gunakan email valid dan kata sandi minimal 12 karakter.');const now=new Date().toISOString();let user=db.users.find(u=>u.email===email);if(user){user.name=input.name.trim();user.role='SYSTEM_ADMINISTRATOR';user.roles=Array.from(new Set([...(user.roles?.length?user.roles:[user.role]),'AUTHOR','SYSTEM_ADMINISTRATOR']));user.verified=true;user.profileComplete=true;user.applicationStatus='APPROVED';user.passwordHash=await hashPassword(input.password);user.updatedAt=now}else{user={id:randomBytes(16).toString('hex'),name:input.name.trim(),email,institution:'Science News 360',role:'SYSTEM_ADMINISTRATOR',roles:['AUTHOR','SYSTEM_ADMINISTRATOR'],verified:true,profileComplete:true,applicationStatus:'APPROVED',passwordHash:await hashPassword(input.password),createdAt:now,updatedAt:now};db.users.push(user)}await audit(db,'ADMIN_BOOTSTRAPPED','Administrator pertama berhasil diaktifkan.',{userId:user.id,email});await writeDb(db);return publicUser(user)}
+export async function login(emailInput:string,password:string,adminOnly=false){const db=await readDb();const email=normalizeEmail(emailInput);const recentFailures=db.audit.filter(a=>a.action==='LOGIN_FAILED'&&a.email===email&&Date.now()-new Date(a.at).getTime()<15*60*1000).length;if(recentFailures>=5)throw new Error('Terlalu banyak percobaan masuk. Coba lagi setelah 15 menit.');const user=db.users.find(u=>u.email===email);if(!user||!(await verifyPassword(password,user.passwordHash))){await audit(db,'LOGIN_FAILED','Email atau kata sandi tidak cocok.',{email});await writeDb(db);throw new Error('Email atau kata sandi tidak valid.')}if(adminOnly&&!(user.roles?.length?user.roles:[user.role]).some(r=>['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(r))){await audit(db,'ADMIN_LOGIN_DENIED','Pengguna tanpa hak Administrator mencoba masuk ke area Administrator.',{userId:user.id,email});await writeDb(db);throw new Error('Anda tidak diizinkan mengakses area Administrator.')}const token=randomBytes(32).toString('hex');const now=new Date();db.sessions.push({token,userId:user.id,createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+SESSION_TTL*1000).toISOString()});user.lastLoginAt=now.toISOString();user.updatedAt=now.toISOString();await audit(db,'LOGIN_SUCCESS','Pengguna berhasil masuk.',{userId:user.id,email});await writeDb(db);return {user:publicUser(user),token,maxAge:SESSION_TTL}}
 export async function logout(token?:string){if(!token)return;const db=await readDb();db.sessions=db.sessions.filter(s=>s.token!==token);await writeDb(db)}
 export async function sessionUser(token?:string){if(!token)return null;const db=await readDb();const session=db.sessions.find(s=>s.token===token&&new Date(s.expiresAt).getTime()>Date.now());if(!session)return null;const user=db.users.find(u=>u.id===session.userId);return user?publicUser(user):null}
 export async function listUsers(){const db=await readDb();return db.users.map(publicUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))}
 export async function listSecurityAudit(){const db=await readDb();return db.audit.slice().reverse().slice(0,200)}
 export async function updateUserByAdmin(id:string,patch:{applicationStatus?:ApplicationStatus;role?:Role}){const db=await readDb();const user=db.users.find(u=>u.id===id);if(!user)throw new Error('Pengguna tidak ditemukan.');if(patch.applicationStatus)user.applicationStatus=patch.applicationStatus;if(patch.role)user.role=patch.role;if(patch.applicationStatus==='APPROVED'&&user.role==='CONTRIBUTOR')user.role='AUTHOR';user.updatedAt=new Date().toISOString();await audit(db,'USER_UPDATED','Administrator memperbarui status/peran pengguna.',{userId:user.id,email:user.email});await writeDb(db);return publicUser(user)}
+
+
+export async function registerAdministrator(input:{name:string;email:string;password:string;secret:string;institution?:string}){
+  const expected=process.env.SN360_ADMIN_REGISTRATION_SECRET;
+  if(!expected||input.secret!==expected)throw new Error('Kode registrasi Administrator tidak valid.');
+
+  const db=await readDb();
+  const email=normalizeEmail(input.email);
+
+  if(!input.name.trim()||!validEmail(email)||input.password.length<12)
+    throw new Error('Gunakan nama, email valid, dan kata sandi minimal 12 karakter.');
+
+  const now=new Date().toISOString();
+  let user=db.users.find(u=>u.email===email);
+
+  if(user){
+    const currentRoles=user.roles?.length?user.roles:[user.role];
+    user.roles=Array.from(new Set([...currentRoles,'AUTHOR','SYSTEM_ADMINISTRATOR']));
+    user.role='SYSTEM_ADMINISTRATOR';
+    user.name=input.name.trim();
+    user.institution=input.institution?.trim()||user.institution||'Science News 360';
+    user.passwordHash=await hashPassword(input.password);
+    user.verified=true;
+    user.profileComplete=true;
+    user.applicationStatus='APPROVED';
+    user.updatedAt=now;
+  }else{
+    user={
+      id:randomBytes(16).toString('hex'),
+      name:input.name.trim(),
+      email,
+      institution:input.institution?.trim()||'Science News 360',
+      role:'SYSTEM_ADMINISTRATOR',
+      roles:['AUTHOR','SYSTEM_ADMINISTRATOR'],
+      verified:true,
+      profileComplete:true,
+      applicationStatus:'APPROVED',
+      passwordHash:await hashPassword(input.password),
+      createdAt:now,
+      updatedAt:now
+    };
+    db.users.push(user);
+  }
+
+  await audit(
+    db,
+    'ADMIN_REGISTERED',
+    'Administrator berhasil dibuat atau dipromosikan.',
+    {userId:user.id,email}
+  );
+
+  await writeDb(db);
+  return publicUser(user);
+}
+
 export async function hasAdministrator(){const db=await readDb();return db.users.some(u=>['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(u.role))}
