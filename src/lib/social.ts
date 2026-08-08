@@ -2,6 +2,12 @@ export const SITE_NAME = 'Science News 360 — Global Science, Education & Innov
 export const DEFAULT_SITE_URL = 'https://sciencenews360.my.id';
 
 export function getSiteUrl() {
+  /*
+   * Production canonical domain Science News 360.
+   * Jangan biarkan NETLIFY_URL / deployment URL menjadi canonical publik.
+   */
+  if (process.env.NODE_ENV === 'production') return DEFAULT_SITE_URL;
+
   const raw = process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL;
   try {
     const url = new URL(raw);
@@ -18,6 +24,22 @@ export function absoluteUrl(pathOrUrl: string, siteUrl = getSiteUrl()) {
     return parsed.toString();
   } catch {
     return new URL(pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`, siteUrl).toString();
+  }
+}
+
+export function normalizePublicUrl(value?: string) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (
+      url.hostname.endsWith('.netlify.app') ||
+      url.hostname === 'sciencenews360-my-id.netlify.app'
+    ) {
+      return absoluteUrl(`${url.pathname}${url.search}`);
+    }
+    return url.toString();
+  } catch {
+    return absoluteUrl(value);
   }
 }
 
