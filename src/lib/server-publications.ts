@@ -101,6 +101,39 @@ export async function listPublishedArticles():Promise<PublicArticle[]>{
   }catch{return []}
 }
 
+
+export async function saveDraftMedia(input:{name:string;contentType:string;data:string;id?:string}):Promise<{id:string;url:string;name:string;contentType:string}>{
+  const match=input.data.match(/^data:([^;]+);base64,(.+)$/);
+  if(!match)throw new Error('Format media tidak valid.');
+
+  const contentType=match[1]||input.contentType||'image/webp';
+  const raw=match[2];
+  const id=input.id||crypto.randomUUID();
+  const ext=contentType.includes('png')?'png':contentType.includes('webp')?'webp':'jpg';
+  const key=`draft-media__${safeSlug(id)}.${ext}`;
+
+  if(useNetlify()){
+    const store=await blobStore();
+    const bytes=Uint8Array.from(Buffer.from(raw,'base64'));
+    await store.set(
+      key,
+      new Blob([bytes],{type:contentType}),
+      {metadata:{contentType,name:input.name||key,draft:'true'}}
+    );
+  }else{
+    const db=await readLocal();
+    db.media[key]={contentType,data:raw};
+    await writeLocal(db);
+  }
+
+  return {
+    id,
+    url:absoluteUrl(`/api/public-media/${encodeURIComponent(key)}`),
+    name:input.name||key,
+    contentType
+  };
+}
+
 export async function readPublicMedia(key:string):Promise<{body:ArrayBuffer;contentType:string}|null>{
   try{
     if(useNetlify()){

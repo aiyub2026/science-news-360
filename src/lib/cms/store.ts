@@ -4,7 +4,30 @@ import {scheduleMirror} from './persistence';
 const CONTENT='sn360-cms-content-v201',AUDIT='sn360-cms-audit-v201',MEDIA='sn360-media-assets-v201';
 const read=<T,>(k:string,f:T):T=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v) as T:f}catch{return f}};
 const emit=()=>{window.dispatchEvent(new CustomEvent('sn360-content-change'));scheduleMirror()};
-function compactRecord(r:ContentRecord):ContentRecord{return {...r,versions:(r.versions||[]).slice(0,20)}}
+function stripMediaPreview<T extends {preview?:string} | undefined>(m:T):T{
+  if(!m)return m;
+  if(typeof m.preview==='string'&&m.preview.startsWith('data:image')){
+    return {...m,preview:''} as T;
+  }
+  return m;
+}
+
+function compactRecord(r:ContentRecord):ContentRecord{
+  return {
+    ...r,
+    thumbnail:stripMediaPreview(r.thumbnail),
+    customVideoThumbnail:stripMediaPreview(r.customVideoThumbnail),
+    inlineMedia:(r.inlineMedia||[]).map(stripMediaPreview),
+    versions:(r.versions||[]).slice(0,20).map(v=>({
+      ...v,
+      snapshot:{
+        ...v.snapshot,
+        thumbnail:stripMediaPreview(v.snapshot?.thumbnail),
+        inlineMedia:(v.snapshot?.inlineMedia||[]).map(stripMediaPreview)
+      }
+    }))
+  };
+}
 function recoverQuota(){try{localStorage.removeItem(MEDIA)}catch{}try{const rows=read<ContentRecord[]>(CONTENT,[]).map(compactRecord);localStorage.setItem(CONTENT,JSON.stringify(rows))}catch{}try{localStorage.setItem(AUDIT,JSON.stringify(read<CmsAudit[]>(AUDIT,[]).slice(0,100)))}catch{}}
 function syncServer(){try{const content=read<ContentRecord[]>(CONTENT,[]),auditRows=read<CmsAudit[]>(AUDIT,[]),media=read<MediaMeta[]>(MEDIA,[]);void fetch('/api/cms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content,audit:auditRows,media})})}catch{}}
 function safeWrite(k:string,v:unknown){const payload=JSON.stringify(v);try{localStorage.setItem(k,payload)}catch(e){if(e instanceof DOMException&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED')){recoverQuota();localStorage.setItem(k,payload)}else throw e}emit();window.setTimeout(syncServer,150)}

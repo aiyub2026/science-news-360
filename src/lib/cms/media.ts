@@ -28,5 +28,33 @@ export async function prepareImage(file:File,kind:'thumbnail'|'inline'|'profile'
  }
  const size=estimatedBytes(preview);
  if(size>target*1.25)throw new Error(`Gambar masih terlalu besar setelah optimasi (${Math.round(size/1024)} KB). Gunakan gambar yang lebih sederhana atau lebih kecil.`);
- return {id:crypto.randomUUID(),name:file.name.replace(/\.[^.]+$/,'.webp'),type:'image/webp',size,preview,width,height,createdAt:new Date().toISOString()};
+ const id=crypto.randomUUID();
+const name=file.name.replace(/\.[^.]+$/,'.webp');
+
+const response=await fetch('/api/cms/media-upload',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({
+    id,
+    name,
+    contentType:'image/webp',
+    data:preview
+  })
+});
+
+const result=await response.json();
+
+if(!response.ok||!result?.media?.url)
+  throw new Error(result?.error||'Upload media ke penyimpanan server gagal.');
+
+return {
+  id,
+  name,
+  type:'image/webp',
+  size,
+  preview:result.media.url,
+  width,
+  height,
+  createdAt:new Date().toISOString()
+};
 }
