@@ -11,9 +11,97 @@ export const stepLabels=[
  'Isi Artikel',
  'Media & Video',
  'Penulis & Afiliasi',
- 'Referensi & Disclosure',
- 'Preview & Submit'
+ 'Referensi & Pernyataan',
+ 'Pratinjau & Kirim'
 ];
+
+export const workflowLabels:Record<ContentRecord['type'],string[]>={
+ SCIENCE_NEWS:[
+  'Jenis Konten',
+  'Informasi Berita',
+  'Isi Berita',
+  'Media Berita',
+  'Penulis & Afiliasi',
+  'Sumber & Disclosure',
+  'Pratinjau & Kirim'
+ ],
+ POPULAR_ARTICLE:[
+  'Jenis Konten',
+  'Informasi Dasar',
+  'Isi Artikel',
+  'Media & Video',
+  'Penulis & Afiliasi',
+  'Referensi & Pernyataan',
+  'Pratinjau & Kirim'
+ ],
+ RESEARCH_HIGHLIGHT:[
+  'Jenis Konten',
+  'Informasi Riset',
+  'Ringkasan Penelitian',
+  'Media Riset',
+  'Peneliti & Afiliasi',
+  'Referensi & DOI',
+  'Pratinjau & Kirim'
+ ],
+ OPINION:[
+  'Jenis Konten',
+  'Informasi Opini',
+  'Isi Opini',
+  'Media Pendukung',
+  'Penulis & Afiliasi',
+  'Referensi & Pernyataan',
+  'Pratinjau & Kirim'
+ ],
+ COURSE_MATERIAL:[
+  'Jenis Konten',
+  'Identitas Akademik',
+  'Materi Pembelajaran',
+  'Media & Lampiran',
+  'Dosen & Afiliasi',
+  'Referensi',
+  'Pratinjau & Kirim'
+ ],
+ LEARNING_MODULE:[
+  'Jenis Konten',
+  'Identitas Modul',
+  'Isi Modul',
+  'Media & Lampiran',
+  'Penyusun & Afiliasi',
+  'Referensi',
+  'Pratinjau & Kirim'
+ ],
+ ACADEMIC_TUTORIAL:[
+  'Jenis Konten',
+  'Informasi Tutorial',
+  'Langkah Tutorial',
+  'Media Tutorial',
+  'Penulis & Afiliasi',
+  'Referensi',
+  'Pratinjau & Kirim'
+ ],
+ LEARNING_VIDEO:[
+  'Jenis Konten',
+  'Informasi Video',
+  'Deskripsi & Materi',
+  'Video & Thumbnail',
+  'Pengajar & Afiliasi',
+  'Referensi & Hak Media',
+  'Pratinjau & Kirim'
+ ],
+ INSTITUTION_NEWS:[
+  'Jenis Konten',
+  'Informasi Berita',
+  'Isi Berita Institusi',
+  'Media Berita',
+  'Institusi & Penulis',
+  'Sumber & Disclosure',
+  'Pratinjau & Kirim'
+ ]
+};
+
+export function getStepLabels(type:ContentRecord['type']){
+ return workflowLabels[type]||stepLabels;
+}
 
 export function validateContent(r:ContentRecord):ValidationIssue[]{
  const issues:ValidationIssue[]=[];
