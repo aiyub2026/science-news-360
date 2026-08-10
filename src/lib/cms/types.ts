@@ -7,7 +7,7 @@ export type ContentVersion={id:string;version:number;createdAt:string;summary:st
 export type CmsAudit={id:string;contentId:string;action:string;at:string;detail:string;actor?:string;role?:string;before?:unknown;after?:unknown};
 export type ContentRecord={
  id:string;title:string;subtitle:string;summary:string;bodyHtml:string;type:ContentType;status:ContentStatus;locale:'id'|'en';
- faculty:string;studyProgram:string;course:string;degree:string;semester:string;topic:string;
+ faculty:string;studyProgram:string;course:string;degree:string;semester:string;topic:string;primaryChannel?:'SCIENCE'|'TECHNOLOGY'|'EDUCATION'|'RESEARCH'|'OPINION';
  thumbnail?:MediaMeta;inlineMedia:MediaMeta[];videoMethod:VideoMethod;videoFile?:MediaMeta;youtubeUrl?:string;youtubeId?:string;youtubeThumbnail?:string;customVideoThumbnail?:MediaMeta;
  authors:AuthorEntry[];references:string;doi:string;funding:string;conflict:string;aiDisclosure:string;
  seoTitle:string;seoDescription:string;focusKeyword?:string;tags?:string[];slug:string;internalLinks?:string[];relatedMode?:'AUTO'|'MANUAL';relatedMiddleId?:string;relatedEndId?:string;
