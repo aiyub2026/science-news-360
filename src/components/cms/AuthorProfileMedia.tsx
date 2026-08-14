@@ -6,6 +6,11 @@ import {prepareImage} from '@/lib/cms/media';
 
 const PROFILE_KEY='sn360-author-profile';
 
+function profileKey(user?:{id?:string;email?:string}|null){
+ const identity=(user?.id||user?.email||'').trim().toLowerCase();
+ return identity?`${PROFILE_KEY}:${identity}`:PROFILE_KEY;
+}
+
 type Profile={
  name:string;
  institution:string;
@@ -77,7 +82,7 @@ export default function AuthorProfileMedia(){
 
  useEffect(()=>{
   try{
-   const saved=JSON.parse(localStorage.getItem(PROFILE_KEY)||'{}');
+   const saved=JSON.parse(localStorage.getItem(profileKey(user))||'{}');
    setP(v=>({
     ...v,
     ...saved,
@@ -225,7 +230,7 @@ export default function AuthorProfileMedia(){
    return;
   }
 
-  localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
+  localStorage.setItem(profileKey(user),JSON.stringify(p));
 
   completeProfile({
    name:p.name,

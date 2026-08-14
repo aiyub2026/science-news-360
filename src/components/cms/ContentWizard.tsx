@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {useRouter,useSearchParams} from 'next/navigation';
 import {ContentRecord,ContentType,MediaMeta} from '@/lib/cms/types';
-import {getContent,saveContent,saveMedia} from '@/lib/cms/store';
+import {getContentForAuthor,saveContent,saveMedia} from '@/lib/cms/store';
 import {prepareImage,MAX_INLINE} from '@/lib/cms/media';
 import {getStepLabels,validateContent,validateStep} from '@/lib/cms/validation';
 import {useAuth} from '@/components/auth/AuthProvider';
@@ -62,7 +62,7 @@ export default function ContentWizard(){
       publicAuthorContentTypes.includes(key as ContentType)
     );const router=useRouter();const search=useSearchParams();const editor=useRef<HTMLDivElement>(null);const [step,setStep]=useState(()=>Number(search.get('step')||0));const editId=search.get('edit');const [record,setRecord]=useState<ContentRecord>(()=>initial(user?.name,user?.email));const [notice,setNotice]=useState<{type:'success'|'error'|'info';text:string}|null>(null);const [busy,setBusy]=useState(false);const [saved,setSaved]=useState('Belum disimpan');
  const update=(patch:Partial<ContentRecord>)=>setRecord(v=>({...v,...patch}));
- useEffect(()=>{if(editId){const existing=getContent(editId);if(existing){setRecord(existing);setSaved('Artikel dimuat untuk diedit');return}}try{const p=JSON.parse(localStorage.getItem('sn360-author-profile')||'{}');setRecord(v=>({...v,authors:[{...v.authors[0],name:p.name||user?.name||v.authors[0].name,email:user?.email||v.authors[0].email,affiliation:p.institution||v.authors[0].affiliation,orcid:p.orcid||'',googleScholar:p.googleScholar||'',website:p.website||'',photo:p.photo||''}]}))}catch{}},[user,editId]);
+ useEffect(()=>{if(editId){const existing=getContentForAuthor(editId,user?.email);if(existing){setRecord(existing);setSaved('Artikel dimuat untuk diedit');return}}try{const p=JSON.parse(localStorage.getItem(`sn360-author-profile:${(user?.id||user?.email||'').trim().toLowerCase()}`)||'{}');setRecord(v=>({...v,authors:[{...v.authors[0],name:p.name||user?.name||v.authors[0].name,email:user?.email||v.authors[0].email,affiliation:p.institution||v.authors[0].affiliation,orcid:p.orcid||'',googleScholar:p.googleScholar||'',website:p.website||'',photo:p.photo||''}]}))}catch{}},[user,editId]);
  useEffect(()=>{
   if(!ready)return;
 

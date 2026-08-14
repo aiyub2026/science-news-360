@@ -33,6 +33,24 @@ function recoverQuota(){try{localStorage.removeItem(MEDIA)}catch{}try{const rows
 function syncServer(){try{const content=read<ContentRecord[]>(CONTENT,[]),auditRows=read<CmsAudit[]>(AUDIT,[]),media=read<MediaMeta[]>(MEDIA,[]);void fetch('/api/cms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content,audit:auditRows,media})})}catch{}}
 function safeWrite(k:string,v:unknown){const payload=JSON.stringify(v);try{localStorage.setItem(k,payload)}catch(e){if(e instanceof DOMException&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED')){recoverQuota();localStorage.setItem(k,payload)}else throw e}emit();window.setTimeout(syncServer,150)}
 export const listContent=()=>read<ContentRecord[]>(CONTENT,[]);
+
+export function contentOwnedByEmail(record:ContentRecord,email?:string){
+ const target=(email||'').trim().toLowerCase();
+ if(!target)return false;
+ return Boolean(
+  record.authors?.some(a=>(a.email||'').trim().toLowerCase()===target)
+ );
+}
+
+export function listContentForAuthor(email?:string){
+ return listContent().filter(r=>contentOwnedByEmail(r,email));
+}
+
+export function getContentForAuthor(id:string,email?:string){
+ const row=getContent(id);
+ return row&&contentOwnedByEmail(row,email)?row:undefined;
+}
+
 export const getContent=(id:string)=>listContent().find(x=>x.id===id)||null;
 export const listAudit=()=>read<CmsAudit[]>(AUDIT,[]);
 export const listMedia=()=>read<MediaMeta[]>(MEDIA,[]);

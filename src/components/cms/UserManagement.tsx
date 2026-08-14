@@ -1,3 +1,29 @@
 'use client';import {useEffect,useState} from 'react';import type {Role,ApplicationStatus} from '@/lib/auth/types';
 type User={id:string;name:string;email:string;institution:string;role:Role;applicationStatus:ApplicationStatus;createdAt:string};type Audit={id:string;action:string;email?:string;detail:string;at:string};
-export default function UserManagement(){const [users,setUsers]=useState<User[]>([]),[audit,setAudit]=useState<Audit[]>([]),[notice,setNotice]=useState('');async function load(){const r=await fetch('/api/auth/users',{cache:'no-store'});if(r.ok){const d=await r.json();setUsers(d.users||[]);setAudit(d.audit||[])}}useEffect(()=>{void load()},[]);async function patch(id:string,p:object){setNotice('Menyimpan…');const r=await fetch('/api/auth/users',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,...p})});setNotice(r.ok?'Perubahan pengguna berhasil disimpan.':'Perubahan gagal.');if(r.ok)await load()}return <section className="admin-user-management"><header><span className="eyebrow">PENGGUNA & PENULIS</span><h1>Kelola akun dan persetujuan penulis</h1><p>Calon penulis tidak dapat mengirim artikel sebelum disetujui Administrator.</p></header>{notice&&<p className="helper-note">{notice}</p>}<div className="admin-user-table">{users.length?users.map(u=><article key={u.id}><div><b>{u.name}</b><small>{u.email} · {u.institution}</small></div><span>{u.applicationStatus}</span><select value={u.role} onChange={e=>patch(u.id,{role:e.target.value})}><option value="CONTRIBUTOR">Kontributor</option><option value="AUTHOR">Penulis</option><option value="REVIEWER">Peninjau</option><option value="LANGUAGE_EDITOR">Editor Bahasa</option><option value="FACT_CHECKER">Pemeriksa Fakta</option><option value="MANAGING_EDITOR">Editor Pelaksana</option><option value="EDITOR_IN_CHIEF">Pemimpin Redaksi</option><option value="PUBLISHER">Penerbit</option><option value="ADMINISTRATOR">Administrator</option></select>{u.applicationStatus==='PENDING'?<div className="admin-user-actions"><button onClick={()=>patch(u.id,{applicationStatus:'APPROVED'})}>Setujui</button><button onClick={()=>patch(u.id,{applicationStatus:'REJECTED'})}>Tolak</button></div>:<small>Dibuat {new Date(u.createdAt).toLocaleDateString('id-ID')}</small>}</article>):<div className="dashboard-empty-state"><h2>Belum ada pendaftar</h2><p>Calon penulis yang mendaftar akan muncul di sini.</p></div>}</div><section className="admin-security-audit"><span className="eyebrow">AKTIVITAS KEAMANAN</span><h2>Riwayat autentikasi dan perubahan pengguna</h2>{audit.length?<div className="audit-log-list">{audit.slice(0,30).map(a=><article key={a.id}><b>{a.action}</b><span>{a.email||'Sistem'}</span><p>{a.detail}</p><small>{new Date(a.at).toLocaleString('id-ID')}</small></article>)}</div>:<p>Belum ada aktivitas keamanan yang tercatat.</p>}</section></section>}
+export default function UserManagement(){const [users,setUsers]=useState<User[]>([]),[audit,setAudit]=useState<Audit[]>([]),[notice,setNotice]=useState('');async function load(){const r=await fetch('/api/auth/users',{cache:'no-store'});if(r.ok){const d=await r.json();setUsers(d.users||[]);setAudit(d.audit||[])}}useEffect(()=>{void load()},[]);async function patch(id:string,p:object){setNotice('Menyimpan…');const r=await fetch('/api/auth/users',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,...p})});setNotice(r.ok?'Perubahan pengguna berhasil disimpan.':'Perubahan gagal.');if(r.ok)await load()}
+
+async function removeUser(u:User){
+ const ok=window.confirm(
+  `Hapus akun secara permanen?\n\nNama: ${u.name}\nEmail: ${u.email}\n\nAkun dan seluruh sesi login pengguna akan dihapus.`
+ );
+
+ if(!ok)return;
+
+ setNotice('Menghapus akun…');
+
+ const r=await fetch('/api/auth/users',{
+  method:'DELETE',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({id:u.id})
+ });
+
+ const d=await r.json().catch(()=>({}));
+
+ if(!r.ok){
+  setNotice(d.error||'Penghapusan akun gagal.');
+  return;
+ }
+
+ setNotice(`Akun ${u.name} berhasil dihapus.`);
+ await load();
+}return <section className="admin-user-management"><header><span className="eyebrow">PENGGUNA & PENULIS</span><h1>Kelola akun dan persetujuan penulis</h1><p>Calon penulis tidak dapat mengirim artikel sebelum disetujui Administrator.</p></header>{notice&&<p className="helper-note">{notice}</p>}<div className="admin-user-table">{users.length?users.map(u=><article key={u.id}><div><b>{u.name}</b><small>{u.email} · {u.institution}</small></div><span>{u.applicationStatus}</span><select value={u.role} onChange={e=>patch(u.id,{role:e.target.value})}><option value="CONTRIBUTOR">Kontributor</option><option value="AUTHOR">Penulis</option><option value="REVIEWER">Peninjau</option><option value="LANGUAGE_EDITOR">Editor Bahasa</option><option value="FACT_CHECKER">Pemeriksa Fakta</option><option value="MANAGING_EDITOR">Editor Pelaksana</option><option value="EDITOR_IN_CHIEF">Pemimpin Redaksi</option><option value="PUBLISHER">Penerbit</option><option value="ADMINISTRATOR">Administrator</option></select>{u.applicationStatus==='PENDING'?<div className="admin-user-actions"><button onClick={()=>patch(u.id,{applicationStatus:'APPROVED'})}>Setujui</button><button onClick={()=>patch(u.id,{applicationStatus:'REJECTED'})}>Tolak</button></div>:<small>Dibuat {new Date(u.createdAt).toLocaleDateString('id-ID')}</small>}<div className="admin-user-actions"><button className="danger-link" onClick={()=>void removeUser(u)}>Hapus Akun</button></div></article>):<div className="dashboard-empty-state"><h2>Belum ada pendaftar</h2><p>Calon penulis yang mendaftar akan muncul di sini.</p></div>}</div><section className="admin-security-audit"><span className="eyebrow">AKTIVITAS KEAMANAN</span><h2>Riwayat autentikasi dan perubahan pengguna</h2>{audit.length?<div className="audit-log-list">{audit.slice(0,30).map(a=><article key={a.id}><b>{a.action}</b><span>{a.email||'Sistem'}</span><p>{a.detail}</p><small>{new Date(a.at).toLocaleString('id-ID')}</small></article>)}</div>:<p>Belum ada aktivitas keamanan yang tercatat.</p>}</section></section>}

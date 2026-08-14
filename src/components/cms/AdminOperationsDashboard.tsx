@@ -2,7 +2,26 @@
 import Link from 'next/link';import {useEffect,useMemo,useState} from 'react';import {ContentRecord,ContentStatus} from '@/lib/cms/types';import {changeStatus,listContent,saveContent,subscribeContent} from '@/lib/cms/store';
 const labels:Record<ContentStatus,string>={DRAFT:'Draf',READY:'Siap',SUBMITTED:'Dikirim',REVIEW:'Sedang Ditinjau',REVISION:'Perlu Revisi',ACCEPTED:'Disetujui',SCHEDULED:'Terjadwal',PUBLISHED:'Terbit',ARCHIVED:'Diarsipkan'};
 const relative=(iso:string)=>{const d=Math.max(0,Date.now()-new Date(iso).getTime());const h=Math.floor(d/3600000);if(h<1)return 'Baru saja';if(h<24)return `${h} jam lalu`;return `${Math.floor(h/24)} hari lalu`};
-export default function AdminOperationsDashboard(){const [rows,setRows]=useState<ContentRecord[]>([]);const [query,setQuery]=useState('');const [status,setStatus]=useState('ALL');const [analytics,setAnalytics]=useState({online:0,todayViews:0,total:0});const refresh=()=>setRows(listContent());useEffect(()=>{refresh();fetch('/api/analytics/visit',{cache:'no-store'}).then(r=>r.json()).then(setAnalytics).catch(()=>{});return subscribeContent(refresh)},[]);
+export default function AdminOperationsDashboard(){const [rows,setRows]=useState<ContentRecord[]>([]);const [query,setQuery]=useState('');const [status,setStatus]=useState('ALL');const [analytics,setAnalytics]=useState({online:0,todayViews:0,total:0});
+
+ const refresh=async()=>{
+  try{
+   const r=await fetch('/api/cms',{cache:'no-store'});
+   if(r.ok){
+    const d=await r.json();
+    setRows(Array.isArray(d.content)?d.content:[]);
+    return;
+   }
+  }catch{}
+  setRows(listContent());
+ };
+
+ useEffect(()=>{
+  void refresh();
+  fetch('/api/analytics/visit',{cache:'no-store'}).then(r=>r.json()).then(setAnalytics).catch(()=>{});
+  const unsub=subscribeContent(()=>void refresh());
+  return unsub;
+ },[]);
  const editorial=useMemo(()=>rows.filter(r=>!['DRAFT','READY','ARCHIVED'].includes(r.status)),[rows]);const visible=editorial.filter(r=>(status==='ALL'||r.status===status)&&(`${r.title} ${r.authors[0]?.name||''}`).toLowerCase().includes(query.toLowerCase()));
  const count=(s:ContentStatus)=>rows.filter(r=>r.status===s).length;const today=new Date().toDateString();const publishedToday=rows.filter(r=>r.status==='PUBLISHED'&&r.publishedAt&&new Date(r.publishedAt).toDateString()===today).length;const pending=count('SUBMITTED')+count('REVIEW');
  const exportCsv=()=>{const head=['Title','Author','Institution','Status','Priority','Updated'];const body=visible.map(r=>[r.title,r.authors[0]?.name||'',r.authors[0]?.affiliation||'',r.status,r.priority||'NORMAL',r.updatedAt]);const csv=[head,...body].map(x=>x.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='science-news-360-submissions.csv';a.click();URL.revokeObjectURL(a.href)};

@@ -31,6 +31,38 @@ export async function logout(token?:string){if(!token)return;const db=await read
 export async function sessionUser(token?:string){if(!token)return null;const db=await readDb();const session=db.sessions.find(s=>s.token===token&&new Date(s.expiresAt).getTime()>Date.now());if(!session)return null;const user=db.users.find(u=>u.id===session.userId);return user?publicUser(user):null}
 export async function listUsers(){const db=await readDb();return db.users.map(publicUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))}
 export async function listSecurityAudit(){const db=await readDb();return db.audit.slice().reverse().slice(0,200)}
+
+export async function deleteUserByAdmin(id:string,actorId:string){
+ const db=await readDb();
+
+ if(id===actorId)throw new Error('Administrator tidak dapat menghapus akun sendiri.');
+
+ const user=db.users.find(u=>u.id===id);
+ if(!user)throw new Error('Pengguna tidak ditemukan.');
+
+ const roles=user.roles?.length?user.roles:[user.role];
+ if(roles.includes('SYSTEM_ADMINISTRATOR')){
+  throw new Error('Akun Administrator Sistem dilindungi dan tidak dapat dihapus.');
+ }
+
+ db.sessions=db.sessions.filter(s=>s.userId!==id);
+ db.users=db.users.filter(u=>u.id!==id);
+
+ await audit(
+  db,
+  'USER_DELETED',
+  'Administrator menghapus akun pengguna secara permanen.',
+  {userId:id,email:user.email}
+ );
+
+ await writeDb(db);
+
+ return {
+  id:user.id,
+  name:user.name,
+  email:user.email
+ };
+}
 export async function updateUserByAdmin(id:string,patch:{applicationStatus?:ApplicationStatus;role?:Role}){const db=await readDb();const user=db.users.find(u=>u.id===id);if(!user)throw new Error('Pengguna tidak ditemukan.');if(patch.applicationStatus)user.applicationStatus=patch.applicationStatus;if(patch.role)user.role=patch.role;if(patch.applicationStatus==='APPROVED'&&user.role==='CONTRIBUTOR')user.role='AUTHOR';user.updatedAt=new Date().toISOString();await audit(db,'USER_UPDATED','Administrator memperbarui status/peran pengguna.',{userId:user.id,email:user.email});await writeDb(db);return publicUser(user)}
 
 

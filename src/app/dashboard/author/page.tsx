@@ -5,7 +5,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {DashboardShell} from '@/components/DashboardShell';
 import {ProtectedPage} from '@/components/auth/ProtectedPage';
 import {useAuth} from '@/components/auth/AuthProvider';
-import {listContent,subscribeContent} from '@/lib/cms/store';
+import {listContentForAuthor,subscribeContent} from '@/lib/cms/store';
 import type {ContentRecord} from '@/lib/cms/types';
 
 const statusLabel:Record<string,string>={
@@ -49,10 +49,10 @@ export default function AuthorDashboard(){
   const [rows,setRows]=useState<ContentRecord[]>([]);
 
   useEffect(()=>{
-    const load=()=>setRows(listContent());
+    const load=()=>setRows(listContentForAuthor(user?.email));
     load();
     return subscribeContent(load);
-  },[]);
+  },[user?.email]);
 
   const summary=useMemo(()=>({
     total:rows.length,
