@@ -62,7 +62,40 @@ export default function ContentWizard(){
       publicAuthorContentTypes.includes(key as ContentType)
     );const router=useRouter();const search=useSearchParams();const editor=useRef<HTMLDivElement>(null);const [step,setStep]=useState(()=>Number(search.get('step')||0));const editId=search.get('edit');const [record,setRecord]=useState<ContentRecord>(()=>initial(user?.name,user?.email));const [notice,setNotice]=useState<{type:'success'|'error'|'info';text:string}|null>(null);const [busy,setBusy]=useState(false);const [saved,setSaved]=useState('Belum disimpan');
  const update=(patch:Partial<ContentRecord>)=>setRecord(v=>({...v,...patch}));
- useEffect(()=>{if(editId){const existing=getContentForAuthor(editId,user?.email);if(existing){setRecord(existing);setSaved('Artikel dimuat untuk diedit');return}}try{const p=JSON.parse(localStorage.getItem(`sn360-author-profile:${(user?.id||user?.email||'').trim().toLowerCase()}`)||'{}');setRecord(v=>({...v,authors:[{...v.authors[0],name:p.name||user?.name||v.authors[0].name,email:user?.email||v.authors[0].email,affiliation:p.institution||v.authors[0].affiliation,orcid:p.orcid||'',googleScholar:p.googleScholar||'',website:p.website||'',photo:p.photo||''}]}))}catch{}},[user,editId]);
+ useEffect(()=>{
+  try{
+    const profile=JSON.parse(
+      localStorage.getItem(
+        `sn360-author-profile:${(user?.id||user?.email||'').trim().toLowerCase()}`
+      )||'{}'
+    );
+
+    const applyCurrentAuthorProfile=(source:ContentRecord)=>({
+      ...source,
+      authors:[{
+        ...source.authors[0],
+        name:profile.name||user?.name||source.authors[0]?.name||'',
+        email:user?.email||source.authors[0]?.email||'',
+        affiliation:profile.institution||source.authors[0]?.affiliation||'',
+        orcid:profile.orcid||source.authors[0]?.orcid||'',
+        googleScholar:profile.googleScholar||source.authors[0]?.googleScholar||'',
+        website:profile.website||source.authors[0]?.website||'',
+        photo:profile.photo||''
+      }]
+    });
+
+    if(editId){
+      const existing=getContentForAuthor(editId,user?.email);
+      if(existing){
+        setRecord(applyCurrentAuthorProfile(existing));
+        setSaved('Artikel dimuat untuk diedit');
+        return;
+      }
+    }
+
+    setRecord(v=>applyCurrentAuthorProfile(v));
+  }catch{}
+},[user,editId]);
  useEffect(()=>{
   if(!ready)return;
 
@@ -96,9 +129,98 @@ export default function ContentWizard(){
  function selectType(type:ContentType){setRecord(v=>({...v,type,kerangkaId:type,bodyHtml:v.bodyHtml||kerangkas[type]}));setNotice({type:'info',text:`Kerangka ${typeLabels[type]} diterapkan. Struktur tetap dapat diedit.`})}
  function next(){const result=validateStep({...record,bodyHtml:editor.current?.innerHTML||record.bodyHtml},step);if(!result.valid){setNotice({type:'error',text:result.issues.map(x=>x.message).join(' ')});return}setStep(x=>Math.min(6,x+1));setNotice(null)}
  async function save(status:'DRAFT'|'SUBMITTED'='DRAFT'){
-  const body=editor.current?.innerHTML||record.bodyHtml;const effectiveStatus=status==='DRAFT'&&editId?record.status:status;const next={...record,bodyHtml:body,status:effectiveStatus,slug:record.slug||slugify(record.title),seoTitle:record.seoTitle||record.title,seoDescription:record.seoDescription||record.summary};
-  if(effectiveStatus==='SUBMITTED'){const all=validateContent(next);if(all.length){setStep(all[0].step);setNotice({type:'error',text:`Perbaiki terlebih dahulu: ${all.map(x=>x.message).join(' ')}`});return}}
-  try{setBusy(true);const stored=saveContent(next,effectiveStatus==='SUBMITTED'?'Dikirim ke tim redaksi':editId?'Article updated':'Manual draft save');setRecord(stored);setSaved(`Tersimpan ${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}`);if(effectiveStatus==='SUBMITTED'){setNotice({type:'success',text:'Artikel dikirim untuk peninjauan redaksi.'});setTimeout(()=>router.push('/dashboard/author/content'),700)}else setNotice({type:'success',text:'Draft berhasil disimpan.'})}catch{setNotice({type:'error',text:'Penyimpanan browser penuh. Hapus media/draft lama atau gunakan gambar yang lebih kecil.'})}finally{setBusy(false)}
+  const body=editor.current?.innerHTML||record.bodyHtml;
+  const effectiveStatus=status==='DRAFT'&&editId?record.status:status;
+
+  const currentAuthor=record.authors?.[0];
+
+  const next={
+   ...record,
+   bodyHtml:body,
+   status:effectiveStatus,
+   slug:record.slug||slugify(record.title),
+   seoTitle:record.seoTitle||record.title,
+   seoDescription:record.seoDescription||record.summary,
+   authors:[
+    {
+     ...currentAuthor,
+     name:currentAuthor?.name||user?.name||'',
+     email:user?.email||currentAuthor?.email||''
+    },
+    ...(record.authors||[]).slice(1)
+   ]
+  };
+
+  try{
+   setBusy(true);
+
+   const stored=saveContent(
+    next,
+    effectiveStatus==='SUBMITTED'
+     ?'Dikirim ke tim redaksi'
+     :editId
+      ?'Article updated'
+      :'Manual draft save'
+   );
+
+   setRecord(stored);
+   setSaved(
+    `Tersimpan ${new Date().toLocaleTimeString('id-ID',{
+     hour:'2-digit',
+     minute:'2-digit'
+    })}`
+   );
+
+   if(effectiveStatus==='SUBMITTED'){
+    setNotice({
+     type:'info',
+     text:'Mengirim artikel ke server redaksi…'
+    });
+
+    const response=await fetch('/api/cms',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({
+      content:[stored],
+      audit:[],
+      media:[]
+     })
+    });
+
+    const payload=await response.json().catch(()=>({}));
+
+    if(!response.ok){
+     throw new Error(
+      payload?.error||
+      'Server redaksi menolak artikel.'
+     );
+    }
+
+    setNotice({
+     type:'success',
+     text:'Artikel berhasil diterima oleh Tim Redaksi.'
+    });
+
+    setTimeout(
+     ()=>router.push('/dashboard/author/content'),
+     900
+    );
+   }else{
+    setNotice({
+     type:'success',
+     text:'Draft berhasil disimpan.'
+    });
+   }
+  }catch(error){
+   setNotice({
+    type:'error',
+    text:error instanceof Error
+     ?`Pengiriman gagal: ${error.message}`
+     :'Pengiriman artikel gagal.'
+   });
+  }finally{
+   setBusy(false);
+  }
  }
  async function addImage(file:File|undefined,kind:'thumbnail'|'inline'|'videoThumb'){
   if(!file)return;if(kind==='inline'&&record.inlineMedia.length>=MAX_INLINE){setNotice({type:'error',text:'Maksimum 3 gambar isi artikel. Hapus satu gambar sebelum menambah yang baru.'});return}

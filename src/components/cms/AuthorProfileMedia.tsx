@@ -81,15 +81,87 @@ export default function AuthorProfileMedia(){
  });
 
  useEffect(()=>{
-  try{
-   const saved=JSON.parse(localStorage.getItem(profileKey(user))||'{}');
+  let cancelled=false;
+
+  async function loadProfile(){
+   let cached:any={};
+
+   try{
+    cached=JSON.parse(
+     localStorage.getItem(profileKey(user))||'{}'
+    );
+   }catch{}
+
+   let remote:any={};
+
+   try{
+    const response=await fetch(
+     '/api/auth/profile',
+     {cache:'no-store'}
+    );
+
+    if(response.ok){
+     const payload=await response.json();
+     remote=payload?.user?.profile||{};
+
+     if(payload?.user){
+      remote.name=
+       remote.name||
+       payload.user.name||
+       '';
+
+      remote.institution=
+       remote.institution||
+       payload.user.institution||
+       '';
+     }
+    }
+   }catch{}
+
+   if(cancelled)return;
+
+   const merged={
+    ...cached,
+    ...remote,
+    photo:remote.photo||'',
+    logo:remote.logo||''
+   };
+
    setP(v=>({
     ...v,
-    ...saved,
-    name:saved.name||user?.name||'',
-    institution:saved.institution||user?.institution||''
+    ...merged,
+    name:
+     merged.name||
+     user?.name||
+     '',
+    institution:
+     merged.institution||
+     user?.institution||
+     ''
    }));
-  }catch{}
+
+   try{
+    const lightweightProfile={
+     ...merged,
+     photo:'',
+     logo:''
+    };
+
+    try{
+     localStorage.setItem(
+      profileKey(user),
+      JSON.stringify(lightweightProfile)
+     );
+    }catch{}
+
+   }catch{}
+  }
+
+  void loadProfile();
+
+  return()=>{
+   cancelled=true;
+  };
  },[user]);
 
  const update=(x:Partial<Profile>)=>setP(v=>({...v,...x}));
@@ -200,7 +272,25 @@ export default function AuthorProfileMedia(){
     drawH
    );
 
-   const compressed=canvas.toDataURL('image/webp',0.86);
+   const MAX_PROFILE_BYTES=250*1024;
+   let quality=0.86;
+   let compressed=canvas.toDataURL('image/webp',quality);
+
+   const dataUrlBytes=(value:string)=>{
+    const base64=value.split(',')[1]||'';
+    return Math.ceil(base64.length*3/4);
+   };
+
+   while(
+    dataUrlBytes(compressed)>MAX_PROFILE_BYTES &&
+    quality>0.46
+   ){
+    quality=Math.max(0.46,quality-0.06);
+    compressed=canvas.toDataURL(
+     'image/webp',
+     Number(quality.toFixed(2))
+    );
+   }
 
    update({photo:compressed});
    setEditor(null);
@@ -216,7 +306,7 @@ export default function AuthorProfileMedia(){
   }
  }
 
- function save(){
+ async function save(){
   if(!p.name.trim()){
    setNotice('Nama Penulis wajib diisi.');
    return;
@@ -230,18 +320,70 @@ export default function AuthorProfileMedia(){
    return;
   }
 
-  localStorage.setItem(profileKey(user),JSON.stringify(p));
+  try{
+   setNotice('Menyimpan profil ke server…');
 
-  completeProfile({
-   name:p.name,
-   institution:p.institution
-  });
+   const response=await fetch(
+    '/api/auth/profile',
+    {
+     method:'PATCH',
+     headers:{
+      'Content-Type':'application/json'
+     },
+     body:JSON.stringify({
+      name:p.name,
+      institution:p.institution,
+      profile:p
+     })
+    }
+   );
 
-  window.dispatchEvent(
-   new CustomEvent('sn360-profile-updated',{detail:p})
-  );
+   const payload=await response.json().catch(()=>({}));
 
-  setNotice('Profil profesional berhasil disimpan.');
+   if(!response.ok){
+    throw new Error(
+     payload?.error||
+     'Server menolak perubahan profil.'
+    );
+   }
+
+   try{
+    const lightweightProfile={
+     ...p,
+     photo:'',
+     logo:''
+    };
+
+    localStorage.setItem(
+     profileKey(user),
+     JSON.stringify(lightweightProfile)
+    );
+   }catch{
+    // Server tetap menjadi sumber utama profil.
+   }
+
+   completeProfile({
+    name:p.name,
+    institution:p.institution
+   });
+
+   window.dispatchEvent(
+    new CustomEvent(
+     'sn360-profile-updated',
+     {detail:p}
+    )
+   );
+
+   setNotice(
+    'Profil profesional berhasil disimpan permanen.'
+   );
+  }catch(error){
+   setNotice(
+    error instanceof Error
+     ?`Profil gagal disimpan: ${error.message}`
+     :'Profil gagal disimpan.'
+   );
+  }
  }
 
  return (
@@ -465,7 +607,7 @@ export default function AuthorProfileMedia(){
            type="button"
            onClick={()=>setEditor(v=>v?{
             ...v,
-            zoom:Math.max(1,v.zoom-0.1)
+            zoom:Math.max(0.35,v.zoom-0.1)
            }:v)}
           >
            −
@@ -473,7 +615,7 @@ export default function AuthorProfileMedia(){
 
           <input
            type="range"
-           min="1"
+           min="0.35"
            max="3"
            step="0.05"
            value={editor.zoom}

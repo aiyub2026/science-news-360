@@ -49,9 +49,32 @@ export default function AuthorDashboard(){
   const [rows,setRows]=useState<ContentRecord[]>([]);
 
   useEffect(()=>{
-    const load=()=>setRows(listContentForAuthor(user?.email));
-    load();
-    return subscribeContent(load);
+    const load=async()=>{
+      try{
+        const response=await fetch(
+          '/api/cms',
+          {cache:'no-store'}
+        );
+
+        if(response.ok){
+          const payload=await response.json();
+
+          setRows(
+            Array.isArray(payload.content)
+              ?payload.content
+              :[]
+          );
+
+          return;
+        }
+      }catch{}
+
+      setRows(listContentForAuthor(user?.email));
+    };
+
+    void load();
+
+    return subscribeContent(()=>void load());
   },[user?.email]);
 
   const summary=useMemo(()=>({

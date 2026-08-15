@@ -41,7 +41,224 @@ export default function FullEditorialWorkspace({id}:{id:string}){const {user}=us
  return()=>{
   cancelled=true;
  };
-},[id]);const score=useMemo(()=>record?editorialSeoScore(record):null,[record]);const intelligence=useMemo(()=>record?analyzeEditorialQuality(record):null,[record]);const relatedCandidates=useMemo(()=>record?listContent().filter(x=>x.id!==record.id&&x.status==='PUBLISHED'&&x.locale===record.locale).sort((a,b)=>relatedScore(record,b)-relatedScore(record,a)):[],[record]);if(loading)return <div className="dashboard-empty-state"><h2>Memuat artikel…</h2><p>Mengambil data dari CMS editorial.</p></div>;if(!record)return <div className="dashboard-empty-state"><h2>Artikel tidak ditemukan</h2><Link href="/dashboard/admin">Kembali ke dashboard</Link></div>;const patch=(p:Partial<ContentRecord>)=>setRecord({...record,...p});const save=(summary=reason)=>{const next=saveContent(record,summary,user?.name||'Administrator',user?.role||'ADMINISTRATOR');setRecord(next);setNotice('Perubahan editorial dan version history berhasil disimpan.')};const feedback=(kind:'success'|'warning'='success')=>{try{const AC=(window.AudioContext||(window as any).webkitAudioContext);const ctx=new AC();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=kind==='success'?880:440;gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.08,ctx.currentTime+.01);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.16);osc.start();osc.stop(ctx.currentTime+.17)}catch{}try{navigator.vibrate?.(kind==='success'?40:[40,30,40])}catch{}};const delay=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));const withTimeout=<T,>(job:Promise<T>,ms=15000)=>Promise.race([job,new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error('Proses publikasi melewati batas waktu 15 detik.')),ms))]);const status=async(s:ContentStatus)=>{if(busy)return;if(s==='PUBLISHED'&&(!user||!hasCapability(user.role,'PUBLISH_CONTENT'))){setNotice('Hanya Penerbit atau Administrator yang dapat menerbitkan artikel.');feedback('warning');return}if(s==='PUBLISHED'&&!confirm('Publikasikan artikel ini sekarang? Artikel akan tampil di beranda dan dapat dibaca publik.'))return;if(s==='SCHEDULED'&&!record.scheduledAt){setNotice('Pilih tanggal dan waktu publikasi sebelum menjadwalkan.');feedback('warning');setTab('publish');return}setBusy(s);try{setNotice('Menyimpan artikel…');await delay(80);const saved=saveContent(record,`Editorial fields saved before ${s}`,user?.name||'Administrator',user?.role||'ADMINISTRATOR');setNotice('Memperbarui status editorial…');await delay(80);const next=await withTimeout(Promise.resolve(changeStatus(saved.id,s,`Status changed to ${s}`,user?.name||'Administrator',user?.role||'ADMINISTRATOR')));if(!next)throw new Error('Artikel tidak ditemukan saat memperbarui status.');setNotice(s==='PUBLISHED'?'Menerbitkan…':'Menyimpan status…');await delay(120);let finalRecord=next;if(s==='PUBLISHED'){setNotice('Menyinkronkan artikel publik dan metadata berbagi…');const response=await withTimeout(fetch('/api/publications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(next)}),15000);const payload=await response.json();if(!response.ok)throw new Error(payload?.error||'Sinkronisasi artikel publik gagal.');finalRecord={...next,canonicalUrl:payload.article.canonicalUrl,socialImageUrl:payload.article.socialImageUrl,socialImageAlt:payload.article.socialImageAlt,thumbnail:next.thumbnail?{...next.thumbnail,preview:payload.article.thumbnailUrl}:next.thumbnail};finalRecord=saveContent(finalRecord,'Metadata publik dan media berhasil disinkronkan',user?.name||'Administrator',user?.role||'ADMINISTRATOR');}setRecord(finalRecord);const label:Record<ContentStatus,string>={DRAFT:'Draft disimpan',READY:'Artikel siap',SUBMITTED:'Artikel dikirim',REVIEW:'Review dimulai',REVISION:'Permintaan revisi dikirim',ACCEPTED:'Artikel disetujui',SCHEDULED:'Artikel dijadwalkan',PUBLISHED:'Success — artikel berhasil dipublikasikan dan tampil di beranda',ARCHIVED:'Artikel diarsipkan'};setNotice(label[s]);feedback('success');setTimeout(()=>noticeRef.current?.scrollIntoView({behavior:'smooth',block:'center'}),10)}catch(error){setNotice(error instanceof Error?`Publikasi gagal: ${error.message}`:'Publikasi gagal. Silakan coba kembali.');feedback('warning')}finally{setBusy('')}};const unpublish=async()=>{
+},[id]);const score=useMemo(()=>record?editorialSeoScore(record):null,[record]);const intelligence=useMemo(()=>record?analyzeEditorialQuality(record):null,[record]);const relatedCandidates=useMemo(()=>record?listContent().filter(x=>x.id!==record.id&&x.status==='PUBLISHED'&&x.locale===record.locale).sort((a,b)=>relatedScore(record,b)-relatedScore(record,a)):[],[record]);if(loading)return <div className="dashboard-empty-state"><h2>Memuat artikel…</h2><p>Mengambil data dari CMS editorial.</p></div>;if(!record)return <div className="dashboard-empty-state"><h2>Artikel tidak ditemukan</h2><Link href="/dashboard/admin">Kembali ke dashboard</Link></div>;const patch=(p:Partial<ContentRecord>)=>setRecord({...record,...p});const save=(summary=reason)=>{const next=saveContent(record,summary,user?.name||'Administrator',user?.role||'ADMINISTRATOR');setRecord(next);setNotice('Perubahan editorial dan version history berhasil disimpan.')};const feedback=(kind:'success'|'warning'='success')=>{try{const AC=(window.AudioContext||(window as any).webkitAudioContext);const ctx=new AC();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.connect(gain);gain.connect(ctx.destination);osc.frequency.value=kind==='success'?880:440;gain.gain.setValueAtTime(.0001,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.08,ctx.currentTime+.01);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.16);osc.start();osc.stop(ctx.currentTime+.17)}catch{}try{navigator.vibrate?.(kind==='success'?40:[40,30,40])}catch{}};const delay=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));const withTimeout=<T,>(job:Promise<T>,ms=15000)=>Promise.race([job,new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error('Proses publikasi melewati batas waktu 15 detik.')),ms))]);const status=async(s:ContentStatus)=>{
+ if(busy)return;
+
+ if(
+  s==='PUBLISHED' &&
+  (!user||!hasCapability(user.role,'PUBLISH_CONTENT'))
+ ){
+  setNotice(
+   'Hanya Penerbit atau Administrator yang dapat menerbitkan artikel.'
+  );
+  feedback('warning');
+  return;
+ }
+
+ if(
+  s==='PUBLISHED' &&
+  !confirm(
+   'Publikasikan artikel ini sekarang? Artikel akan tampil di beranda dan dapat dibaca publik.'
+  )
+ )return;
+
+ if(s==='SCHEDULED'&&!record.scheduledAt){
+  setNotice(
+   'Pilih tanggal dan waktu publikasi sebelum menjadwalkan.'
+  );
+  feedback('warning');
+  setTab('publish');
+  return;
+ }
+
+ setBusy(s);
+
+ try{
+  // -------------------------------------------------
+  // 1. Simpan kondisi editorial terbaru ke CMS SERVER
+  // -------------------------------------------------
+  setNotice('Menyimpan perubahan ke CMS server…');
+
+  const prepared={
+   ...record,
+   updatedAt:new Date().toISOString()
+  };
+
+  const saveResponse=await withTimeout(
+   fetch('/api/cms',{
+    method:'POST',
+    headers:{
+     'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+     content:[prepared],
+     audit:[],
+     media:[]
+    })
+   }),
+   15000
+  );
+
+  const savePayload=
+   await saveResponse.json().catch(()=>({}));
+
+  if(!saveResponse.ok){
+   throw new Error(
+    savePayload?.error||
+    'Perubahan editorial gagal disimpan ke CMS server.'
+   );
+  }
+
+  // -------------------------------------------------
+  // 2. Ubah status langsung pada CMS SERVER
+  // -------------------------------------------------
+  setNotice('Memperbarui status editorial…');
+
+  const statusResponse=await withTimeout(
+   fetch('/api/cms',{
+    method:'PATCH',
+    headers:{
+     'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+     id:record.id,
+     status:s
+    })
+   }),
+   15000
+  );
+
+  const statusPayload=
+   await statusResponse.json().catch(()=>({}));
+
+  if(!statusResponse.ok){
+   throw new Error(
+    statusPayload?.error||
+    'Status editorial gagal diperbarui.'
+   );
+  }
+
+  let finalRecord=
+   statusPayload.content as ContentRecord;
+
+  if(!finalRecord){
+   throw new Error(
+    'CMS server tidak mengembalikan artikel setelah perubahan status.'
+   );
+  }
+
+  // -------------------------------------------------
+  // 3. Jika PUBLISHED → publication store
+  // -------------------------------------------------
+  if(s==='PUBLISHED'){
+   setNotice(
+    'Menyinkronkan artikel publik dan metadata berbagi…'
+   );
+
+   const publicationResponse=await withTimeout(
+    fetch('/api/publications',{
+     method:'POST',
+     headers:{
+      'Content-Type':'application/json'
+     },
+     body:JSON.stringify(finalRecord)
+    }),
+    15000
+   );
+
+   const publicationPayload=
+    await publicationResponse.json().catch(()=>({}));
+
+   if(!publicationResponse.ok){
+    throw new Error(
+     publicationPayload?.error||
+     'Sinkronisasi artikel publik gagal.'
+    );
+   }
+
+   finalRecord={
+    ...finalRecord,
+    canonicalUrl:
+     publicationPayload.article.canonicalUrl,
+    socialImageUrl:
+     publicationPayload.article.socialImageUrl,
+    socialImageAlt:
+     publicationPayload.article.socialImageAlt,
+    thumbnail:
+     finalRecord.thumbnail
+      ?{
+        ...finalRecord.thumbnail,
+        preview:publicationPayload.article.thumbnailUrl
+       }
+      :finalRecord.thumbnail,
+    updatedAt:new Date().toISOString()
+   };
+
+   // Metadata hasil publikasi juga simpan ke CMS SERVER.
+   const metadataResponse=await fetch('/api/cms',{
+    method:'POST',
+    headers:{
+     'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+     content:[finalRecord],
+     audit:[],
+     media:[]
+    })
+   });
+
+   if(!metadataResponse.ok){
+    const metadataPayload=
+     await metadataResponse.json().catch(()=>({}));
+
+    throw new Error(
+     metadataPayload?.error||
+     'Metadata publik gagal disimpan ke CMS server.'
+    );
+   }
+  }
+
+  // -------------------------------------------------
+  // 4. UI memakai hasil SERVER, bukan localStorage
+  // -------------------------------------------------
+  setRecord(finalRecord);
+
+  const label:Record<ContentStatus,string>={
+   DRAFT:'Draft disimpan',
+   READY:'Artikel siap',
+   SUBMITTED:'Artikel dikirim',
+   REVIEW:'Review dimulai',
+   REVISION:'Permintaan revisi dikirim',
+   ACCEPTED:'Artikel disetujui',
+   SCHEDULED:'Artikel dijadwalkan',
+   PUBLISHED:
+    'Success — artikel berhasil dipublikasikan dan tampil di beranda',
+   ARCHIVED:'Artikel diarsipkan'
+  };
+
+  setNotice(label[s]);
+  feedback('success');
+
+  setTimeout(
+   ()=>noticeRef.current?.scrollIntoView({
+    behavior:'smooth',
+    block:'center'
+   }),
+   10
+  );
+
+ }catch(error){
+  setNotice(
+   error instanceof Error
+    ?`Publikasi gagal: ${error.message}`
+    :'Publikasi gagal. Silakan coba kembali.'
+  );
+
+  feedback('warning');
+ }finally{
+  setBusy('');
+ }
+};const unpublish=async()=>{
  if(busy||!record)return;
 
  if(!confirm(

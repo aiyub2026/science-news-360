@@ -29,9 +29,114 @@ function compactRecord(r:ContentRecord):ContentRecord{
     }))
   };
 }
-function recoverQuota(){try{localStorage.removeItem(MEDIA)}catch{}try{const rows=read<ContentRecord[]>(CONTENT,[]).map(compactRecord);localStorage.setItem(CONTENT,JSON.stringify(rows))}catch{}try{localStorage.setItem(AUDIT,JSON.stringify(read<CmsAudit[]>(AUDIT,[]).slice(0,100)))}catch{}}
-function syncServer(){try{const content=read<ContentRecord[]>(CONTENT,[]),auditRows=read<CmsAudit[]>(AUDIT,[]),media=read<MediaMeta[]>(MEDIA,[]);void fetch('/api/cms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content,audit:auditRows,media})})}catch{}}
-function safeWrite(k:string,v:unknown){const payload=JSON.stringify(v);try{localStorage.setItem(k,payload)}catch(e){if(e instanceof DOMException&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED')){recoverQuota();localStorage.setItem(k,payload)}else throw e}emit();window.setTimeout(syncServer,150)}
+
+function lightCacheRecord(record:ContentRecord):ContentRecord{
+ const compact=compactRecord(record);
+
+ return {
+  ...compact,
+  versions:(compact.versions||[])
+   .slice(0,3)
+   .map(v=>({
+    ...v,
+    snapshot:{
+     ...v.snapshot,
+     bodyHtml:'',
+     references:'',
+     inlineMedia:[],
+     thumbnail:stripMediaPreview(v.snapshot?.thumbnail)
+    }
+   }))
+ };
+}
+
+function recoverQuota(){
+ try{
+  localStorage.removeItem(MEDIA);
+ }catch{}
+
+ try{
+  const rows=read<ContentRecord[]>(CONTENT,[])
+   .map(lightCacheRecord);
+
+  localStorage.setItem(
+   CONTENT,
+   JSON.stringify(rows)
+  );
+ }catch{}
+
+ try{
+  localStorage.setItem(
+   AUDIT,
+   JSON.stringify(
+    read<CmsAudit[]>(AUDIT,[]).slice(0,100)
+   )
+  );
+ }catch{}
+}
+function syncServer(){
+ try{
+  const auditRows=read<CmsAudit[]>(AUDIT,[]);
+  const media=read<MediaMeta[]>(MEDIA,[]);
+
+  void fetch('/api/cms',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({
+    content:[],
+    audit:auditRows,
+    media
+   })
+  });
+ }catch{}
+}
+
+function syncContentRecord(record:ContentRecord){
+ try{
+  void fetch('/api/cms',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({
+    content:[record],
+    audit:[],
+    media:[]
+   })
+  });
+ }catch{}
+}
+function safeWrite(k:string,v:unknown){
+ const cacheValue=
+  k===CONTENT && Array.isArray(v)
+   ?v.map(x=>lightCacheRecord(x as ContentRecord))
+   :v;
+
+ const payload=JSON.stringify(cacheValue);
+
+ try{
+  localStorage.setItem(k,payload);
+ }catch(e){
+  if(
+   e instanceof DOMException &&
+   (
+    e.name==='QuotaExceededError' ||
+    e.name==='NS_ERROR_DOM_QUOTA_REACHED'
+   )
+  ){
+   recoverQuota();
+
+   try{
+    localStorage.setItem(k,payload);
+   }catch{
+    // Cache browser tidak boleh menggagalkan CMS server workflow.
+   }
+  }else{
+   throw e;
+  }
+ }
+
+ emit();
+ window.setTimeout(syncServer,150);
+}
 export const listContent=()=>read<ContentRecord[]>(CONTENT,[]);
 
 export function contentOwnedByEmail(record:ContentRecord,email?:string){
@@ -62,7 +167,31 @@ export function saveContent(record:ContentRecord,summary='Draft saved',actor='Cu
  const rows=listContent(),i=rows.findIndex(x=>x.id===record.id),now=new Date().toISOString(),previous=i>=0?rows[i]:null,version=(previous?.versions?.[0]?.version||0)+1;
  const snapshot={title:record.title,subtitle:record.subtitle,summary:record.summary,bodyHtml:record.bodyHtml,status:record.status,thumbnail:record.thumbnail,inlineMedia:record.inlineMedia,videoMethod:record.videoMethod,youtubeUrl:record.youtubeUrl,seoTitle:record.seoTitle,seoDescription:record.seoDescription,focusKeyword:record.focusKeyword,tags:record.tags,internalLinks:record.internalLinks,relatedMode:record.relatedMode,relatedMiddleId:record.relatedMiddleId,relatedEndId:record.relatedEndId,slug:record.slug,canonicalUrl:record.canonicalUrl,openGraphTitle:record.openGraphTitle,openGraphDescription:record.openGraphDescription,socialImageUrl:record.socialImageUrl,socialImageAlt:record.socialImageAlt,twitterCard:record.twitterCard,editorialNotes:record.editorialNotes,factCheckNotes:record.factCheckNotes};
  const next:ContentRecord={...record,priority:record.priority||'NORMAL',updatedAt:now,submittedAt:record.status==='SUBMITTED'?(record.submittedAt||now):record.submittedAt,reviewStartedAt:record.status==='REVIEW'?(record.reviewStartedAt||now):record.reviewStartedAt,approvedAt:record.status==='ACCEPTED'?(record.approvedAt||now):record.approvedAt,publishedAt:record.status==='PUBLISHED'?(record.publishedAt||now):record.publishedAt,versions:[{id:safeUUID(),version,createdAt:now,summary,snapshot},...(previous?.versions||record.versions||[])].slice(0,30)};
- if(i>=0)rows[i]=next;else rows.unshift(next);safeWrite(CONTENT,rows.map(compactRecord));audit(record.id,'CONTENT_SAVED',summary,{actor,role,before:previous?{status:previous.status,title:previous.title}:null,after:{status:next.status,title:next.title}});return next;
+ if(i>=0)rows[i]=next;
+ else rows.unshift(next);
+
+ safeWrite(CONTENT,rows);
+
+ audit(
+  record.id,
+  'CONTENT_SAVED',
+  summary,
+  {
+   actor,
+   role,
+   before:previous
+    ?{status:previous.status,title:previous.title}
+    :null,
+   after:{
+    status:next.status,
+    title:next.title
+   }
+  }
+ );
+
+ syncContentRecord(next);
+
+ return next;
 }
 export function changeStatus(id:string,status:ContentStatus,detail:string,actor='Editorial user',role='EDITOR'){const r=getContent(id);if(!r)return null;const now=new Date().toISOString();const next={...r,status,publishedAt:status==='PUBLISHED'?(r.publishedAt||now):r.publishedAt,approvedAt:status==='ACCEPTED'?(r.approvedAt||now):r.approvedAt,reviewStartedAt:status==='REVIEW'?(r.reviewStartedAt||now):r.reviewStartedAt};return saveContent(next,detail,actor,role)}
 export function duplicateContent(id:string){const r=getContent(id);if(!r)return null;const now=new Date().toISOString();return saveContent({...r,id:safeUUID(),title:`Salinan — ${r.title}`,slug:`${r.slug}-copy`,status:'DRAFT',createdAt:now,updatedAt:now,publishedAt:undefined,versions:[]},'Content duplicated')}

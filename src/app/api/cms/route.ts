@@ -1,4 +1,5 @@
-import {NextResponse} from 'next/server';import {cookies} from 'next/headers';import {sessionUser} from '@/lib/auth/server';import {hasCapability} from '@/lib/auth/permissions';import {mergeCms,readCms} from '@/lib/cms/server-store';import {sameOrigin} from '@/lib/security';
+import {NextResponse} from 'next/server';import {cookies} from 'next/headers';import {sessionUser} from '@/lib/auth/server';import {hasCapability} from '@/lib/auth/permissions';import {mergeCms,readCms,writeCms} from '@/lib/cms/server-store';import {sameOrigin} from '@/lib/security';
+import type {ContentStatus} from '@/lib/cms/types';
 const ADMIN_ONLY_CONTENT_TYPES=new Set([
  'COURSE_MATERIAL',
  'LEARNING_MODULE',
@@ -25,3 +26,94 @@ if(!isAdministrator(u)){
   }
  }
 }if(!hasCapability(u.role,'REVIEW_CONTENT')&&!hasCapability(u.role,'MANAGE_USERS'))for(const r of records){if(!r.authors?.some((a:any)=>a.email?.toLowerCase()===u.email.toLowerCase()))return NextResponse.json({error:'Tidak boleh menyimpan konten milik pengguna lain.'},{status:403})}const db=await mergeCms(body);return NextResponse.json({ok:true,count:db.content.length})}
+
+
+export async function PATCH(req:Request){
+ if(!sameOrigin(req)){
+  return NextResponse.json(
+   {error:'Permintaan tidak diizinkan.'},
+   {status:403}
+  );
+ }
+
+ const u=await current();
+
+ if(!u){
+  return NextResponse.json(
+   {error:'Akses ditolak.'},
+   {status:401}
+  );
+ }
+
+ if(
+  !hasCapability(u.role,'REVIEW_CONTENT') &&
+  !hasCapability(u.role,'MANAGE_USERS') &&
+  !hasCapability(u.role,'PUBLISH_CONTENT')
+ ){
+  return NextResponse.json(
+   {error:'Anda tidak memiliki hak untuk mengubah status editorial.'},
+   {status:403}
+  );
+ }
+
+ const body=await req.json();
+ const id=String(body.id||'');
+ const status=String(body.status||'') as ContentStatus;
+
+ const allowed:ContentStatus[]=[
+  'SUBMITTED',
+  'REVIEW',
+  'REVISION',
+  'ACCEPTED',
+  'SCHEDULED',
+  'PUBLISHED',
+  'ARCHIVED'
+ ];
+
+ if(!id || !allowed.includes(status)){
+  return NextResponse.json(
+   {error:'ID artikel atau status editorial tidak valid.'},
+   {status:400}
+  );
+ }
+
+ const db=await readCms();
+ const index=db.content.findIndex((r:any)=>r.id===id);
+
+ if(index<0){
+  return NextResponse.json(
+   {error:'Artikel tidak ditemukan di CMS server.'},
+   {status:404}
+  );
+ }
+
+ const currentRecord:any=db.content[index];
+ const now=new Date().toISOString();
+
+ const next:any={
+  ...currentRecord,
+  status,
+  updatedAt:now
+ };
+
+ if(status==='REVIEW' && !next.reviewStartedAt){
+  next.reviewStartedAt=now;
+ }
+
+ if(status==='ACCEPTED' && !next.approvedAt){
+  next.approvedAt=now;
+ }
+
+ if(status==='PUBLISHED' && !next.publishedAt){
+  next.publishedAt=now;
+ }
+
+ db.content[index]=next;
+
+ await writeCms(db);
+
+ return NextResponse.json(
+  {ok:true,content:next},
+  {headers:{'Cache-Control':'no-store'}}
+ );
+}

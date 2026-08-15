@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ContentRecord, MediaMeta } from '@/lib/cms/types';
 import { absoluteUrl, getSiteUrl, isPublicHttpsImage } from '@/lib/social';
+import {getAuthorProfileByEmail} from '@/lib/auth/server';
 
 export type PublicArticle = {
   id: string;
@@ -71,9 +72,35 @@ export async function savePublishedArticle(record:ContentRecord):Promise<PublicA
   const socialCandidate=thumbnailPublic||youtube||firstPublic||(isPublicHttpsImage(record.socialImageUrl)?record.socialImageUrl:undefined);
   const fallback=absoluteUrl('/images/social-default-1200x630.webp');
   const canonical=absoluteUrl(`/${record.locale}/article/${encodeURIComponent(record.slug)}`);
+  const authorRecord=record.authors?.[0];
+  const authorEmail=(authorRecord?.email||'').trim().toLowerCase();
+
+  const authorAccount=authorEmail
+    ?await getAuthorProfileByEmail(authorEmail)
+    :null;
+
+  const authorProfile=authorAccount?.profile||{};
+
+  const resolvedAuthorName=
+    authorProfile.name||
+    authorAccount?.name||
+    authorRecord?.name||
+    'Science News 360';
+
+  const resolvedAuthorInstitution=
+    authorProfile.institution||
+    authorAccount?.institution||
+    authorRecord?.affiliation||
+    'Science News 360';
+
+  const resolvedAuthorPhoto=
+    authorProfile.photo||
+    authorRecord?.photo||
+    undefined;
+
   const article:PublicArticle={
     id:record.id,locale:record.locale,slug:record.slug,title:record.title,subtitle:record.subtitle,summary:record.summary,bodyHtml:record.bodyHtml,type:record.type,
-    author:record.authors?.[0]?.name||'Science News 360',authorInstitution:record.authors?.[0]?.affiliation||'Science News 360',authorPhoto:record.authors?.[0]?.photo,
+    author:resolvedAuthorName,authorInstitution:resolvedAuthorInstitution,authorPhoto:resolvedAuthorPhoto,
     tags:record.tags||[],category:record.topic||record.type.replaceAll('_',' '),publishedAt:record.publishedAt||new Date().toISOString(),updatedAt:record.updatedAt||new Date().toISOString(),doi:record.doi,references:record.references,
     thumbnailUrl:thumbnailPublic||firstPublic||fallback,thumbnailAlt:record.thumbnail?.alt||record.socialImageAlt||record.title,thumbnailCaption:record.thumbnail?.caption,thumbnailCredit:record.thumbnail?.credit,
     canonicalUrl:canonical,seoTitle:record.seoTitle||record.title,seoDescription:record.seoDescription||record.summary,openGraphTitle:record.openGraphTitle||record.seoTitle||record.title,

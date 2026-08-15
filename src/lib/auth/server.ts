@@ -9,7 +9,7 @@ const STORE_NAME='sn360-production-auth';
 const DB_FILE=path.join(process.cwd(),'.sn360-data','auth.json');
 const SESSION_TTL=60*60*24*14;
 
-export type UserRecord={id:string;name:string;email:string;institution:string;role:Role;roles?:Role[];verified:boolean;profileComplete:boolean;applicationStatus:ApplicationStatus;passwordHash:string;createdAt:string;updatedAt:string;lastLoginAt?:string};
+export type UserRecord={id:string;name:string;email:string;institution:string;role:Role;roles?:Role[];verified:boolean;profileComplete:boolean;applicationStatus:ApplicationStatus;passwordHash:string;createdAt:string;updatedAt:string;lastLoginAt?:string;profile?:Record<string,string>};
 type SessionRecord={token:string;userId:string;createdAt:string;expiresAt:string};
 export type SecurityAudit={id:string;action:string;userId?:string;email?:string;detail:string;at:string;ip?:string};
 type AuthDb={users:UserRecord[];sessions:SessionRecord[];audit:SecurityAudit[]};
@@ -29,6 +29,76 @@ export async function bootstrapAdministrator(input:{name:string;email:string;pas
 export async function login(emailInput:string,password:string,adminOnly=false){const db=await readDb();const email=normalizeEmail(emailInput);const recentFailures=db.audit.filter(a=>a.action==='LOGIN_FAILED'&&a.email===email&&Date.now()-new Date(a.at).getTime()<15*60*1000).length;if(recentFailures>=5)throw new Error('Terlalu banyak percobaan masuk. Coba lagi setelah 15 menit.');const user=db.users.find(u=>u.email===email);if(!user||!(await verifyPassword(password,user.passwordHash))){await audit(db,'LOGIN_FAILED','Email atau kata sandi tidak cocok.',{email});await writeDb(db);throw new Error('Email atau kata sandi tidak valid.')}if(adminOnly&&!(user.roles?.length?user.roles:[user.role]).some(r=>['ADMINISTRATOR','SYSTEM_ADMINISTRATOR'].includes(r))){await audit(db,'ADMIN_LOGIN_DENIED','Pengguna tanpa hak Administrator mencoba masuk ke area Administrator.',{userId:user.id,email});await writeDb(db);throw new Error('Anda tidak diizinkan mengakses area Administrator.')}const token=randomBytes(32).toString('hex');const now=new Date();db.sessions.push({token,userId:user.id,createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+SESSION_TTL*1000).toISOString()});user.lastLoginAt=now.toISOString();user.updatedAt=now.toISOString();await audit(db,'LOGIN_SUCCESS','Pengguna berhasil masuk.',{userId:user.id,email});await writeDb(db);return {user:publicUser(user),token,maxAge:SESSION_TTL}}
 export async function logout(token?:string){if(!token)return;const db=await readDb();db.sessions=db.sessions.filter(s=>s.token!==token);await writeDb(db)}
 export async function sessionUser(token?:string){if(!token)return null;const db=await readDb();const session=db.sessions.find(s=>s.token===token&&new Date(s.expiresAt).getTime()>Date.now());if(!session)return null;const user=db.users.find(u=>u.id===session.userId);return user?publicUser(user):null}
+export async function updateOwnProfile(
+ id:string,
+ input:{
+  name?:string;
+  institution?:string;
+  profile?:Record<string,string>;
+ }
+){
+ const db=await readDb();
+ const user=db.users.find(u=>u.id===id);
+
+ if(!user)throw new Error('Pengguna tidak ditemukan.');
+
+ if(input.name?.trim())user.name=input.name.trim();
+ if(input.institution?.trim())user.institution=input.institution.trim();
+
+ if(input.profile&&typeof input.profile==='object'){
+  const clean:Record<string,string>={};
+
+  for(const [key,value] of Object.entries(input.profile)){
+   if(
+    typeof key==='string' &&
+    key.length<=64 &&
+    typeof value==='string' &&
+    value.length<=2000000
+   ){
+    clean[key]=value;
+   }
+  }
+
+  user.profile={
+   ...(user.profile||{}),
+   ...clean
+  };
+ }
+
+ user.profileComplete=true;
+ user.updatedAt=new Date().toISOString();
+
+ await audit(
+  db,
+  'PROFILE_UPDATED',
+  'Pengguna memperbarui profil profesional.',
+  {userId:user.id,email:user.email}
+ );
+
+ await writeDb(db);
+
+ return publicUser(user);
+}
+
+export async function getAuthorProfileByEmail(emailInput:string){
+ const db=await readDb();
+ const email=normalizeEmail(emailInput);
+
+ const user=db.users.find(
+  u=>normalizeEmail(u.email)===email
+ );
+
+ if(!user)return null;
+
+ return {
+  id:user.id,
+  name:user.name,
+  email:user.email,
+  institution:user.institution,
+  profile:user.profile||{}
+ };
+}
+
 export async function listUsers(){const db=await readDb();return db.users.map(publicUser).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))}
 export async function listSecurityAudit(){const db=await readDb();return db.audit.slice().reverse().slice(0,200)}
 
