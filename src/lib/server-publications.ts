@@ -84,6 +84,31 @@ export async function savePublishedArticle(record:ContentRecord):Promise<PublicA
   return article;
 }
 
+export async function removePublishedArticle(locale:'id'|'en',slug:string):Promise<boolean>{
+  const key=publicationKey(locale,slug);
+
+  try{
+    if(useNetlify()){
+      const store=await blobStore();
+      const existing=await store.get(key,{type:'json',consistency:'strong'});
+      if(!existing)return false;
+      await store.delete(key);
+      return true;
+    }
+
+    const db=await readLocal();
+
+    if(!db.publications[key])return false;
+
+    delete db.publications[key];
+    await writeLocal(db);
+
+    return true;
+  }catch{
+    return false;
+  }
+}
+
 export async function getPublishedArticle(locale:'id'|'en',slug:string):Promise<PublicArticle|null>{
   try{
     if(useNetlify()){const store=await blobStore();return await store.get(publicationKey(locale,slug),{type:'json',consistency:'strong'}) as PublicArticle|null}

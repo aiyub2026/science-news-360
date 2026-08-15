@@ -1,4 +1,50 @@
-import {NextResponse} from 'next/server';import {revalidatePath} from 'next/cache';import {cookies} from 'next/headers';import type {ContentRecord} from '@/lib/cms/types';import {listPublishedArticles,savePublishedArticle} from '@/lib/server-publications';import {sessionUser} from '@/lib/auth/server';import {hasCapability} from '@/lib/auth/permissions';import {sameOrigin} from '@/lib/security';
+import {NextResponse} from 'next/server';import {revalidatePath} from 'next/cache';import {cookies} from 'next/headers';import type {ContentRecord} from '@/lib/cms/types';import {listPublishedArticles,savePublishedArticle,removePublishedArticle} from '@/lib/server-publications';import {sessionUser} from '@/lib/auth/server';import {hasCapability} from '@/lib/auth/permissions';import {sameOrigin} from '@/lib/security';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(){return NextResponse.json({articles:await listPublishedArticles()},{headers:{'Cache-Control':'no-store'}})}
 export async function POST(request:Request){if(!sameOrigin(request))return NextResponse.json({error:'Permintaan tidak diizinkan.'},{status:403});try{const jar=await cookies();const user=await sessionUser(jar.get('sn360_session')?.value);if(!user||!hasCapability(user.role,'PUBLISH_CONTENT'))return NextResponse.json({error:'Hanya Penerbit atau Administrator yang dapat menerbitkan artikel.'},{status:403});const record=await request.json() as ContentRecord;if(!record?.id||!record?.slug)return NextResponse.json({error:'Data artikel tidak lengkap.'},{status:400});if(record.status!=='PUBLISHED')return NextResponse.json({error:'Status artikel belum Published.'},{status:400});const article=await savePublishedArticle(record);revalidatePath(`/${article.locale}/article/${article.slug}`);revalidatePath(`/${article.locale}`);revalidatePath(`/${article.locale}/category/${article.category.toLowerCase().replace(/[^a-z0-9]+/g,'-')}`);revalidatePath(`/${article.locale}/authors`);revalidatePath('/sitemap.xml');revalidatePath('/rss.xml');return NextResponse.json({ok:true,article},{headers:{'Cache-Control':'no-store'}})}catch(error){return NextResponse.json({error:error instanceof Error?error.message:'Sinkronisasi artikel gagal.'},{status:500})}}
+
+
+export async function DELETE(request:Request){
+ if(!sameOrigin(request)){
+  return NextResponse.json({error:'Permintaan tidak diizinkan.'},{status:403});
+ }
+
+ try{
+  const jar=await cookies();
+  const user=await sessionUser(jar.get('sn360_session')?.value);
+
+  if(!user||!hasCapability(user.role,'PUBLISH_CONTENT')){
+   return NextResponse.json(
+    {error:'Hanya Penerbit atau Administrator yang dapat menarik artikel.'},
+    {status:403}
+   );
+  }
+
+  const body=await request.json();
+  const locale=body?.locale;
+  const slug=body?.slug;
+
+  if((locale!=='id'&&locale!=='en')||!slug){
+   return NextResponse.json(
+    {error:'Locale atau slug artikel tidak valid.'},
+    {status:400}
+   );
+  }
+
+  const removed=await removePublishedArticle(locale,slug);
+
+  revalidatePath(`/${locale}/article/${slug}`);
+  revalidatePath(`/${locale}`);
+  revalidatePath(`/${locale}/authors`);
+  revalidatePath('/sitemap.xml');
+  revalidatePath('/news-sitemap.xml');
+  revalidatePath('/rss.xml');
+
+  return NextResponse.json({ok:true,removed});
+ }catch(error){
+  return NextResponse.json(
+   {error:error instanceof Error?error.message:'Artikel gagal ditarik dari publikasi.'},
+   {status:500}
+  );
+ }
+}

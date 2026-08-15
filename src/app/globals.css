@@ -1910,3 +1910,58 @@ button{min-height:40px}
   width:100%;
  }
 }
+
+/* ===== ADMIN ARTICLE ACTION MENU FIX V1 ===== */
+
+.submissions-panel,
+.admin-table,
+.admin-table-row {
+  overflow: visible !important;
+}
+
+.row-actions {
+  position: relative;
+  overflow: visible !important;
+}
+
+.row-actions[open] {
+  z-index: 5000;
+}
+
+.row-actions > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.row-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-actions > div {
+  position: absolute !important;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 9999 !important;
+
+  min-width: 230px;
+  max-height: min(460px, 70vh);
+  overflow-y: auto !important;
+
+  background: #fff;
+  border: 1px solid #dfe6ef;
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(15, 35, 60, .16);
+  padding: 8px;
+}
+
+.row-actions > div > a,
+.row-actions > div > button {
+  width: 100%;
+  display: block;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.row-actions .danger-link {
+  font-weight: 700;
+}
